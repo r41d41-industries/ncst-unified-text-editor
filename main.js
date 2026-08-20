@@ -101,7 +101,7 @@ function filePayload(result) {
   return {
     canceled: false,
     path: result.path || null,
-    content: result.content || "",
+    content: result.content == null ? "" : String(result.content),
     kind: result.kind || files.kindFromPath(result.path),
     recentFiles: settings.recentFiles,
   };
