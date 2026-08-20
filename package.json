@@ -1,0 +1,20 @@
+{
+  "name": "ncst-unified-text-editor",
+  "version": "0.1.0",
+  "description": "NCST Unified Text Editor — local markdown/text editor (Electron) and reusable editor module",
+  "main": "main.js",
+  "author": "NCST",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/markdown.test.js",
+    "launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1",
+    "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop-shortcut.ps1"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6"
+  }
+}

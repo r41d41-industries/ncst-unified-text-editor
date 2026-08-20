@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:"
+    />
+    <title>NCST Unified Text Editor</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="drawer" class="drawer open">
+        <button id="drawer-toggle" class="drawer-toggle" type="button" title="Collapse drawer">«</button>
+        <nav class="rail" aria-label="File and view">
+          <button type="button" data-cmd="new" title="New">
+            <span class="icon" aria-hidden="true">＋</span><span class="label">New</span>
+          </button>
+          <button type="button" data-cmd="open" title="Open">
+            <span class="icon" aria-hidden="true">📂</span><span class="label">Open</span>
+          </button>
+          <button type="button" data-cmd="save" title="Save">
+            <span class="icon" aria-hidden="true">💾</span><span class="label">Save</span>
+          </button>
+          <button type="button" data-cmd="saveAs" title="Save As">
+            <span class="icon" aria-hidden="true">📄</span><span class="label">Save As</span>
+          </button>
+          <button type="button" id="btn-preview" data-cmd="preview" title="Preview">
+            <span class="icon" aria-hidden="true">👁</span><span class="label">Preview</span>
+          </button>
+          <button type="button" id="btn-options" data-cmd="options" title="Options">
+            <span class="icon" aria-hidden="true">⚙</span><span class="label">Options</span>
+          </button>
+        </nav>
+        <section id="options-panel" class="hidden">
+          <h2>Options</h2>
+          <label><input id="opt-toolbar" type="checkbox" checked /> Show formatting bar</label>
+          <label><input id="opt-spell" type="checkbox" checked /> Spellcheck</label>
+          <label for="opt-date">Date format</label>
+          <input id="opt-date" type="text" value="MM/DD/YY" />
+          <label for="opt-time">Time format</label>
+          <input id="opt-time" type="text" value="h:mm A" />
+          <label for="opt-combined">Combined format</label>
+          <input id="opt-combined" type="text" value="{date} {time}" />
+          <h2>Recent files</h2>
+          <ul id="recent-files"></ul>
+        </section>
+      </aside>
+      <div id="workspace">
+        <div id="toolbar">
+          <button type="button" data-fmt="bold" title="Bold">B</button>
+          <button type="button" data-fmt="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-fmt="strike" title="Strikethrough"><s>S</s></button>
+          <button type="button" data-fmt="heading" title="Heading">H</button>
+          <button type="button" data-fmt="ul" title="List">•</button>
+          <button type="button" data-fmt="task" title="Checklist">☑</button>
+          <button type="button" data-fmt="quote" title="Quote">“</button>
+          <button type="button" data-fmt="code" title="Code">&lt;/&gt;</button>
+          <button type="button" data-fmt="link" title="Link">🔗</button>
+          <button type="button" data-fmt="table" title="Table">▦</button>
+          <button type="button" data-fmt="hr" title="Horizontal rule">—</button>
+        </div>
+        <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
+        <div id="preview" class="hidden"></div>
+      </div>
+    </div>
+    <div id="ctx" class="ctx hidden" role="menu"></div>
+    <script src="../node_modules/markdown-it/dist/markdown-it.min.js"></script>
+    <script src="markdown.js"></script>
+    <script src="format.js"></script>
+    <script src="context-menu.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>
