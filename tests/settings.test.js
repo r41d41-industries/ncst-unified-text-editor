@@ -21,3 +21,14 @@ test("rejects unknown viewMode", () => {
   const s = normalizeSettings({ viewMode: "split" });
   assert.equal(s.viewMode, "source");
 });
+
+test("keeps custom toolbar order and drops unknown tools", () => {
+  const s = normalizeSettings({ toolbarItems: ["table", "bogus", "bold", "bold"] });
+  assert.deepEqual(s.toolbarItems, ["table", "bold"]);
+});
+
+test("empty toolbar items fall back to defaults", () => {
+  const s = normalizeSettings({ toolbarItems: [] });
+  assert.ok(s.toolbarItems.includes("bold"));
+  assert.ok(s.toolbarItems.includes("heading"));
+});

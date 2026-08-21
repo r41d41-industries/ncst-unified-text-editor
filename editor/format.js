@@ -40,6 +40,28 @@
     return { lineStart, lineEnd };
   }
 
+  function headingLevelOfLine(line) {
+    const match = String(line || "").match(/^(#{1,6})(?:\s|$)/);
+    return match ? match[1].length : 0;
+  }
+
+  function setLineBlock(textarea, kind) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+    const { lineStart, lineEnd } = lineRange(value, start, end);
+    let line = value.slice(lineStart, lineEnd);
+    line = line.replace(/^(#{1,6})\s+/, "");
+    if (/^h[1-6]$/.test(kind)) {
+      line = "#".repeat(Number(kind.slice(1))) + " " + line;
+    }
+    textarea.value = value.slice(0, lineStart) + line + value.slice(lineEnd);
+    const caret = lineStart + line.length;
+    textarea.setSelectionRange(caret, caret);
+    textarea.focus();
+    emitInput(textarea);
+  }
+
   function prefixLines(textarea, prefix) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -79,7 +101,14 @@
     bold: (el) => applyWrap(el, "**", "**", "bold"),
     italic: (el) => applyWrap(el, "*", "*", "italic"),
     strike: (el) => applyWrap(el, "~~", "~~", "text"),
-    heading: (el) => prefixLines(el, "## "),
+    heading: (el) => setLineBlock(el, "h2"),
+    paragraph: (el) => setLineBlock(el, "p"),
+    h1: (el) => setLineBlock(el, "h1"),
+    h2: (el) => setLineBlock(el, "h2"),
+    h3: (el) => setLineBlock(el, "h3"),
+    h4: (el) => setLineBlock(el, "h4"),
+    h5: (el) => setLineBlock(el, "h5"),
+    h6: (el) => setLineBlock(el, "h6"),
     ul: (el) => prefixLines(el, "- "),
     task: (el) => prefixLines(el, "- [ ] "),
     quote: (el) => prefixLines(el, "> "),
@@ -97,5 +126,14 @@
     if (fn && textarea) fn(textarea);
   }
 
-  return { applyWrap, insertAtCaret, prefixLines, replaceWordAt, run, ACTIONS };
+  return {
+    applyWrap,
+    insertAtCaret,
+    prefixLines,
+    replaceWordAt,
+    setLineBlock,
+    headingLevelOfLine,
+    run,
+    ACTIONS,
+  };
 });

@@ -2,6 +2,12 @@
   const editor = document.getElementById("editor");
   const preview = document.getElementById("preview");
   const liveEl = document.getElementById("live");
+  const compose = document.getElementById("compose");
+  const gutter = document.getElementById("gutter");
+  const gutterChip = document.getElementById("gutter-chip");
+  const headingMenu = document.getElementById("heading-menu");
+  const toolbarModal = document.getElementById("toolbar-modal");
+  const toolbarToolList = document.getElementById("toolbar-tool-list");
   const drawer = document.getElementById("drawer");
   const drawerToggle = document.getElementById("drawer-toggle");
   const toolbar = document.getElementById("toolbar");
@@ -10,6 +16,7 @@
   const btnPreview = document.getElementById("btn-preview");
   const btnOptions = document.getElementById("btn-options");
   const optToolbar = document.getElementById("opt-toolbar");
+  const optCustomizeToolbar = document.getElementById("opt-customize-toolbar");
   const optSpell = document.getElementById("opt-spell");
   const optDate = document.getElementById("opt-date");
   const optTime = document.getElementById("opt-time");
@@ -105,6 +112,7 @@
         markdown: body || "",
         spellcheck: optSpell.checked,
         onUpdate: () => markDirty(),
+        onSelection: () => updateGutter(),
       });
     } else {
       liveHandle.setMarkdown(body || "");
@@ -121,9 +129,11 @@
     btnLive.classList.toggle("active", mode === "live");
     btnPreview.classList.toggle("active", mode === "reading");
     btnLive.disabled = state.kind === "text";
+    gutter.classList.toggle("hidden", mode === "reading");
     toolbar.querySelectorAll("button").forEach((b) => {
       b.disabled = mode === "reading";
     });
+    updateGutter();
   }
 
   function setMode(next, persistIt) {
@@ -184,6 +194,7 @@
     optDate.value = settings.dateFormat || "MM/DD/YY";
     optTime.value = settings.timeFormat || "h:mm A";
     optCombined.value = settings.combinedFormat || "{date} {time}";
+    renderToolbar(settings.toolbarItems);
     renderRecent(settings.recentFiles || []);
     state.mode = settings.viewMode || "source";
   }
@@ -194,6 +205,136 @@
       renderRecent(settings.recentFiles || []);
       return settings;
     });
+  }
+
+  function renderToolbar(items) {
+    const ids = NcstTools.normalizeItems(items || (state.settings && state.settings.toolbarItems));
+    toolbar.innerHTML = "";
+    ids.forEach((id) => {
+      const tool = NcstTools.BY_ID[id];
+      if (!tool) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.fmt = tool.id;
+      btn.title = tool.label;
+      btn.textContent = tool.glyph;
+      toolbar.appendChild(btn);
+    });
+    toolbar.querySelectorAll("button").forEach((b) => {
+      b.disabled = state.mode === "reading";
+    });
+  }
+
+  function sourceLineInfo() {
+    const value = editor.value;
+    const pos = editor.selectionStart;
+    const lineStart = value.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+    let lineEnd = value.indexOf("\n", pos);
+    if (lineEnd < 0) lineEnd = value.length;
+    const line = value.slice(lineStart, lineEnd);
+    const lineIndex = (value.slice(0, lineStart).match(/\n/g) || []).length;
+    const level = NcstFormat.headingLevelOfLine(line);
+    return {
+      line,
+      lineIndex,
+      kind: level ? "h" + level : "paragraph",
+      label: level ? "H" + level : "P",
+    };
+  }
+
+  function updateGutter() {
+    if (state.mode === "reading") {
+      gutterChip.classList.add("hidden");
+      return;
+    }
+    if (state.mode === "live" && liveHandle) {
+      try {
+        const info = liveHandle.getBlockInfo();
+        gutterChip.textContent = info.label;
+        gutterChip.dataset.kind = info.kind;
+        const rect = liveHandle.caretRect(compose);
+        gutterChip.style.top = Math.max(4, rect.top - 2) + "px";
+        gutterChip.classList.remove("hidden");
+      } catch {
+        gutterChip.classList.add("hidden");
+      }
+      return;
+    }
+    if (state.mode === "source") {
+      const info = sourceLineInfo();
+      gutterChip.textContent = info.label;
+      gutterChip.dataset.kind = info.kind;
+      const cs = window.getComputedStyle(editor);
+      const lineHeight = parseFloat(cs.lineHeight) || 21;
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      const top = paddingTop + info.lineIndex * lineHeight - editor.scrollTop;
+      gutterChip.style.top = Math.max(4, top) + "px";
+      gutterChip.classList.toggle("hidden", top < -8 || top > compose.clientHeight);
+      return;
+    }
+    gutterChip.classList.add("hidden");
+  }
+
+  function hideHeadingMenu() {
+    headingMenu.classList.add("hidden");
+  }
+
+  function showHeadingMenu() {
+    hideCtx();
+    const chipRect = gutterChip.getBoundingClientRect();
+    headingMenu.classList.remove("hidden");
+    const menuRect = headingMenu.getBoundingClientRect();
+    let left = chipRect.right + 4;
+    let top = chipRect.top;
+    if (left + menuRect.width > window.innerWidth - 8) left = chipRect.left - menuRect.width - 4;
+    if (top + menuRect.height > window.innerHeight - 8) top = window.innerHeight - menuRect.height - 8;
+    headingMenu.style.left = Math.max(8, left) + "px";
+    headingMenu.style.top = Math.max(8, top) + "px";
+  }
+
+  function applyBlockKind(kind) {
+    if (state.mode === "live" && liveHandle) liveHandle.run(kind);
+    else NcstFormat.run(kind, editor);
+    updateGutter();
+  }
+
+  function openToolbarModal() {
+    const enabled = new Set(NcstTools.normalizeItems(state.settings && state.settings.toolbarItems));
+    const order = [
+      ...NcstTools.normalizeItems(state.settings && state.settings.toolbarItems),
+      ...NcstTools.CATALOG.map((t) => t.id).filter((id) => !enabled.has(id)),
+    ];
+    toolbarToolList.innerHTML = "";
+    order.forEach((id) => {
+      const tool = NcstTools.BY_ID[id];
+      if (!tool) return;
+      const li = document.createElement("li");
+      li.dataset.id = id;
+      li.innerHTML =
+        '<input type="checkbox"' +
+        (enabled.has(id) ? " checked" : "") +
+        ' /><span class="tool-label">' +
+        tool.label +
+        '</span><button type="button" class="tool-move" data-move="up">↑</button><button type="button" class="tool-move" data-move="down">↓</button>';
+      toolbarToolList.appendChild(li);
+    });
+    toolbarModal.classList.remove("hidden");
+  }
+
+  function closeToolbarModal() {
+    toolbarModal.classList.add("hidden");
+  }
+
+  function collectToolbarItems() {
+    return [...toolbarToolList.querySelectorAll("li")]
+      .filter((li) => li.querySelector("input").checked)
+      .map((li) => li.dataset.id);
+  }
+
+  function saveToolbarItems(items) {
+    const next = NcstTools.normalizeItems(items);
+    renderToolbar(next);
+    persist({ toolbarItems: next });
   }
 
   function renderRecent(paths) {
@@ -362,10 +503,54 @@
   editor.addEventListener("input", () => {
     markDirty();
     if (state.mode === "reading") renderPreview();
+    updateGutter();
+  });
+  editor.addEventListener("keyup", updateGutter);
+  editor.addEventListener("click", updateGutter);
+  editor.addEventListener("scroll", updateGutter);
+  liveEl.addEventListener("scroll", updateGutter);
+
+  gutterChip.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (headingMenu.classList.contains("hidden")) showHeadingMenu();
+    else hideHeadingMenu();
+  });
+
+  headingMenu.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-block]");
+    if (!btn) return;
+    e.stopPropagation();
+    applyBlockKind(btn.getAttribute("data-block"));
+    hideHeadingMenu();
+  });
+
+  optCustomizeToolbar.addEventListener("click", () => openToolbarModal());
+  document.getElementById("toolbar-modal-close").addEventListener("click", closeToolbarModal);
+  document.getElementById("toolbar-done").addEventListener("click", () => {
+    saveToolbarItems(collectToolbarItems());
+    closeToolbarModal();
+  });
+  document.getElementById("toolbar-reset").addEventListener("click", () => {
+    saveToolbarItems(NcstTools.DEFAULT_ITEMS.slice());
+    openToolbarModal();
+  });
+  toolbarToolList.addEventListener("click", (e) => {
+    const move = e.target.getAttribute("data-move");
+    if (!move) return;
+    const li = e.target.closest("li");
+    if (!li) return;
+    if (move === "up" && li.previousElementSibling) {
+      toolbarToolList.insertBefore(li, li.previousElementSibling);
+    } else if (move === "down" && li.nextElementSibling) {
+      toolbarToolList.insertBefore(li.nextElementSibling, li);
+    }
   });
 
   document.addEventListener("click", (e) => {
     if (!ctx.contains(e.target)) hideCtx();
+    if (!headingMenu.contains(e.target) && e.target !== gutterChip) hideHeadingMenu();
+    if (e.target === toolbarModal) closeToolbarModal();
   });
 
   drawerToggle.addEventListener("click", () => {
@@ -387,8 +572,9 @@
     });
   });
 
-  toolbar.querySelectorAll("[data-fmt]").forEach((btn) => {
-    btn.addEventListener("click", () => runFormat(btn.getAttribute("data-fmt")));
+  toolbar.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-fmt]");
+    if (btn) runFormat(btn.getAttribute("data-fmt"));
   });
 
   optToolbar.addEventListener("change", () => {
@@ -441,6 +627,11 @@
       NcstFormat.run("italic", editor);
     } else if (e.key === "Escape") {
       hideCtx();
+      hideHeadingMenu();
+      closeToolbarModal();
+    } else if (e.key === "Enter" && e.shiftKey && state.mode === "source") {
+      e.preventDefault();
+      NcstFormat.insertAtCaret(editor, state.kind === "text" ? "\n" : "  \n");
     }
   });
 

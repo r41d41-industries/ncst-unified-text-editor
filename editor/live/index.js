@@ -27,6 +27,7 @@ const LiveKeys = Extension.create({
         if (moved) return true;
         return editor.chain().addRowAfter().goToNextCell().run();
       },
+      "Shift-Enter": ({ editor }) => editor.commands.setHardBreak(),
     };
   },
 });
@@ -36,6 +37,13 @@ const ACTIONS = {
   italic: (ed) => ed.chain().focus().toggleItalic().run(),
   strike: (ed) => ed.chain().focus().toggleStrike().run(),
   heading: (ed) => ed.chain().focus().toggleHeading({ level: 2 }).run(),
+  paragraph: (ed) => ed.chain().focus().setParagraph().run(),
+  h1: (ed) => ed.chain().focus().setHeading({ level: 1 }).run(),
+  h2: (ed) => ed.chain().focus().setHeading({ level: 2 }).run(),
+  h3: (ed) => ed.chain().focus().setHeading({ level: 3 }).run(),
+  h4: (ed) => ed.chain().focus().setHeading({ level: 4 }).run(),
+  h5: (ed) => ed.chain().focus().setHeading({ level: 5 }).run(),
+  h6: (ed) => ed.chain().focus().setHeading({ level: 6 }).run(),
   ul: (ed) => ed.chain().focus().toggleBulletList().run(),
   task: (ed) => ed.chain().focus().toggleTaskList().run(),
   quote: (ed) => ed.chain().focus().toggleBlockquote().run(),
@@ -46,7 +54,31 @@ const ACTIONS = {
   hr: (ed) => ed.chain().focus().setHorizontalRule().run(),
 };
 
-function createEditor(element, markdown, spellcheck, onUpdate) {
+function blockInfo(editor) {
+  for (let level = 1; level <= 6; level += 1) {
+    if (editor.isActive("heading", { level })) {
+      return { type: "heading", level, label: "H" + level, kind: "h" + level };
+    }
+  }
+  if (editor.isActive("orderedList")) return { type: "list", label: "OL", kind: "ol" };
+  if (editor.isActive("taskList")) return { type: "list", label: "☑", kind: "task" };
+  if (editor.isActive("bulletList")) return { type: "list", label: "UL", kind: "ul" };
+  if (editor.isActive("blockquote")) return { type: "quote", label: "“", kind: "quote" };
+  if (editor.isActive("codeBlock")) return { type: "code", label: "{}", kind: "code" };
+  return { type: "paragraph", label: "P", kind: "paragraph" };
+}
+
+function caretRect(editor, relativeTo) {
+  const { from } = editor.state.selection;
+  const coords = editor.view.coordsAtPos(from);
+  const origin = relativeTo.getBoundingClientRect();
+  return {
+    top: coords.top - origin.top,
+    height: Math.max(16, coords.bottom - coords.top),
+  };
+}
+
+function createEditor(element, markdown, spellcheck, onUpdate, onSelection) {
   return new Editor({
     element,
     content: markdown || "",
@@ -74,6 +106,10 @@ function createEditor(element, markdown, spellcheck, onUpdate) {
     ],
     onUpdate: () => {
       if (onUpdate) onUpdate();
+      if (onSelection) onSelection();
+    },
+    onSelectionUpdate: () => {
+      if (onSelection) onSelection();
     },
   });
 }
@@ -81,11 +117,24 @@ function createEditor(element, markdown, spellcheck, onUpdate) {
 export function mount(options) {
   const element = options.element;
   const onUpdate = options.onUpdate;
-  let editor = createEditor(element, options.markdown || "", options.spellcheck !== false, onUpdate);
+  const onSelection = options.onSelection;
+  let editor = createEditor(
+    element,
+    options.markdown || "",
+    options.spellcheck !== false,
+    onUpdate,
+    onSelection
+  );
 
   return {
     getMarkdown() {
       return editor.getMarkdown ? editor.getMarkdown() : "";
+    },
+    getBlockInfo() {
+      return blockInfo(editor);
+    },
+    caretRect(relativeTo) {
+      return caretRect(editor, relativeTo || element);
     },
     setMarkdown(markdown) {
       editor.commands.setContent(markdown || "", { contentType: "markdown", emitUpdate: false });

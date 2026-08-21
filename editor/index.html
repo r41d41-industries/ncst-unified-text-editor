@@ -39,6 +39,7 @@
         <section id="options-panel" class="hidden">
           <h2>Options</h2>
           <label><input id="opt-toolbar" type="checkbox" checked /> Show formatting bar</label>
+          <button id="opt-customize-toolbar" type="button">Customize formatting bar…</button>
           <label><input id="opt-spell" type="checkbox" checked /> Spellcheck</label>
           <label for="opt-date">Date format</label>
           <input id="opt-date" type="text" value="MM/DD/YY" />
@@ -51,28 +52,47 @@
         </section>
       </aside>
       <div id="workspace">
-        <div id="toolbar">
-          <button type="button" data-fmt="bold" title="Bold">B</button>
-          <button type="button" data-fmt="italic" title="Italic"><i>I</i></button>
-          <button type="button" data-fmt="strike" title="Strikethrough"><s>S</s></button>
-          <button type="button" data-fmt="heading" title="Heading">H</button>
-          <button type="button" data-fmt="ul" title="List">•</button>
-          <button type="button" data-fmt="task" title="Checklist">☑</button>
-          <button type="button" data-fmt="quote" title="Quote">“</button>
-          <button type="button" data-fmt="code" title="Code">&lt;/&gt;</button>
-          <button type="button" data-fmt="link" title="Link">🔗</button>
-          <button type="button" data-fmt="table" title="Table">▦</button>
-          <button type="button" data-fmt="hr" title="Horizontal rule">—</button>
+        <div id="toolbar"></div>
+        <div id="compose">
+          <aside id="gutter" aria-label="Line type">
+            <button id="gutter-chip" type="button" class="gutter-chip hidden" title="Set heading or paragraph">P</button>
+          </aside>
+          <div id="compose-main">
+            <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
+            <div id="live" class="hidden"></div>
+            <div id="preview" class="hidden"></div>
+          </div>
         </div>
-        <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
-        <div id="live" class="hidden"></div>
-        <div id="preview" class="hidden"></div>
       </div>
     </div>
     <div id="ctx" class="ctx hidden" role="menu"></div>
+    <div id="heading-menu" class="ctx hidden" role="menu">
+      <button type="button" class="ctx-item" data-block="paragraph">Paragraph</button>
+      <button type="button" class="ctx-item" data-block="h1">Heading 1</button>
+      <button type="button" class="ctx-item" data-block="h2">Heading 2</button>
+      <button type="button" class="ctx-item" data-block="h3">Heading 3</button>
+      <button type="button" class="ctx-item" data-block="h4">Heading 4</button>
+      <button type="button" class="ctx-item" data-block="h5">Heading 5</button>
+      <button type="button" class="ctx-item" data-block="h6">Heading 6</button>
+    </div>
+    <div id="toolbar-modal" class="modal hidden" role="dialog" aria-labelledby="toolbar-modal-title">
+      <div class="modal-card">
+        <header>
+          <h2 id="toolbar-modal-title">Formatting toolbar</h2>
+          <button id="toolbar-modal-close" type="button" title="Close">×</button>
+        </header>
+        <p class="modal-help">Check tools to show. Use arrows to reorder.</p>
+        <ul id="toolbar-tool-list"></ul>
+        <footer>
+          <button id="toolbar-reset" type="button">Reset defaults</button>
+          <button id="toolbar-done" type="button" class="accent">Done</button>
+        </footer>
+      </div>
+    </div>
     <script src="../node_modules/markdown-it/dist/markdown-it.min.js"></script>
     <script src="markdown.js"></script>
     <script src="format.js"></script>
+    <script src="tools.js"></script>
     <script src="context-menu.js"></script>
     <script src="live-preview.bundle.js"></script>
     <script src="editor.js"></script>
