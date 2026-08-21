@@ -23,6 +23,12 @@
   const optCombined = document.getElementById("opt-combined");
   const recentList = document.getElementById("recent-files");
   const ctx = document.getElementById("ctx");
+  const docTitle = document.getElementById("doc-title");
+
+  document.querySelectorAll("[data-icon]").forEach((el) => {
+    const svg = NcstTools.DRAWER_ICONS[el.getAttribute("data-icon")];
+    if (svg) el.innerHTML = svg;
+  });
 
   const host = window.api;
   if (!host) {
@@ -45,6 +51,8 @@
     misspelled: "",
     settings: null,
     frontmatter: null,
+    docTitle: "Untitled",
+    titleEdited: false,
   };
 
   let liveHandle = null;
@@ -52,6 +60,23 @@
   function basename(filePath) {
     if (!filePath) return "Untitled";
     return filePath.split(/[/\\]/).pop();
+  }
+
+  function stemFromPath(filePath) {
+    const base = basename(filePath);
+    return base.replace(/\.(md|txt|markdown)$/i, "") || "Untitled";
+  }
+
+  function suggestedFileName() {
+    const raw = (docTitle.textContent || state.docTitle || "Untitled").replace(/\s+/g, " ").trim();
+    return raw.replace(/[<>:"/\\|?*]/g, "").trim() || "Untitled";
+  }
+
+  function setDocTitle(text, fromFile) {
+    const next = String(text || "Untitled").trim() || "Untitled";
+    state.docTitle = next;
+    if (fromFile) state.titleEdited = false;
+    if (document.activeElement !== docTitle) docTitle.textContent = next;
   }
 
   function joinFrontmatter(frontmatter, body) {
@@ -78,7 +103,7 @@
   }
 
   function syncTitle() {
-    const name = basename(state.path);
+    const name = state.docTitle || stemFromPath(state.path);
     const title = (state.dirty ? "• " : "") + name;
     host.setDirty(state.dirty, title);
   }
@@ -166,6 +191,7 @@
     state.frontmatter = split.frontmatter;
     state.savedContent = text;
     state.dirty = false;
+    setDocTitle(filePath ? stemFromPath(filePath) : "Untitled", true);
     let mode = state.mode;
     if (state.kind === "text" && mode === "live") mode = "source";
     if (mode === "live") ensureLive(split.body);
@@ -194,7 +220,7 @@
     optDate.value = settings.dateFormat || "MM/DD/YY";
     optTime.value = settings.timeFormat || "h:mm A";
     optCombined.value = settings.combinedFormat || "{date} {time}";
-    renderToolbar(settings.toolbarItems);
+    renderToolbar(settings.toolbarLayout || settings.toolbarItems);
     renderRecent(settings.recentFiles || []);
     state.mode = settings.viewMode || "source";
   }
@@ -207,18 +233,86 @@
     });
   }
 
-  function renderToolbar(items) {
-    const ids = NcstTools.normalizeItems(items || (state.settings && state.settings.toolbarItems));
+  function toolButton(id) {
+    const tool = NcstTools.BY_ID[id];
+    if (!tool) return null;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.fmt = tool.id;
+    btn.title = tool.label;
+    btn.innerHTML = (tool.icon || "") + '<span class="sr-only">' + tool.label + "</span>";
+    return btn;
+  }
+
+  function closeToolbarMenus() {
+    toolbar.querySelectorAll(".toolbar-dd-menu").forEach((el) => el.classList.add("hidden"));
+  }
+
+  function renderToolbar(layoutOrItems) {
+    const layout = NcstTools.normalizeLayout(
+      Array.isArray(layoutOrItems) && layoutOrItems[0] && typeof layoutOrItems[0] === "object"
+        ? layoutOrItems
+        : state.settings && state.settings.toolbarLayout,
+      Array.isArray(layoutOrItems) && typeof layoutOrItems[0] === "string" ? layoutOrItems : state.settings && state.settings.toolbarItems
+    );
     toolbar.innerHTML = "";
-    ids.forEach((id) => {
-      const tool = NcstTools.BY_ID[id];
-      if (!tool) return;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.dataset.fmt = tool.id;
-      btn.title = tool.label;
-      btn.textContent = tool.glyph;
-      toolbar.appendChild(btn);
+    layout.forEach((entry) => {
+      if (entry.t === "divider") {
+        const sep = document.createElement("span");
+        sep.className = "toolbar-sep";
+        sep.setAttribute("aria-hidden", "true");
+        toolbar.appendChild(sep);
+        return;
+      }
+      if (entry.t === "group") {
+        const wrap = document.createElement("span");
+        wrap.className = "toolbar-group";
+        entry.items.forEach((id) => {
+          const btn = toolButton(id);
+          if (btn) wrap.appendChild(btn);
+        });
+        toolbar.appendChild(wrap);
+        return;
+      }
+      if (entry.t === "dropdown") {
+        const wrap = document.createElement("div");
+        wrap.className = "toolbar-dd";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "toolbar-dd-btn";
+        btn.title = entry.label;
+        const iconId = entry.items[0] || "heading";
+        btn.innerHTML =
+          (NcstTools.BY_ID[iconId] && NcstTools.BY_ID[iconId].icon ? NcstTools.BY_ID[iconId].icon : NcstTools.ICONS.heading) +
+          '<span>' +
+          entry.label +
+          "</span>" +
+          NcstTools.ICONS.chevron;
+        const menu = document.createElement("div");
+        menu.className = "toolbar-dd-menu hidden";
+        entry.items.forEach((id) => {
+          const tool = NcstTools.BY_ID[id];
+          if (!tool) return;
+          const item = document.createElement("button");
+          item.type = "button";
+          item.dataset.fmt = tool.id;
+          item.innerHTML = (tool.icon || "") + "<span>" + tool.label + "</span>";
+          menu.appendChild(item);
+        });
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const open = menu.classList.contains("hidden");
+          closeToolbarMenus();
+          if (open) menu.classList.remove("hidden");
+        });
+        wrap.appendChild(btn);
+        wrap.appendChild(menu);
+        toolbar.appendChild(wrap);
+        return;
+      }
+      const btn = toolButton(entry.id);
+      if (btn) toolbar.appendChild(btn);
     });
     toolbar.querySelectorAll("button").forEach((b) => {
       b.disabled = state.mode === "reading";
@@ -329,26 +423,125 @@
     scheduleGutter();
   }
 
-  function openToolbarModal() {
-    const enabled = new Set(NcstTools.normalizeItems(state.settings && state.settings.toolbarItems));
-    const order = [
-      ...NcstTools.normalizeItems(state.settings && state.settings.toolbarItems),
-      ...NcstTools.CATALOG.map((t) => t.id).filter((id) => !enabled.has(id)),
-    ];
-    toolbarToolList.innerHTML = "";
-    order.forEach((id) => {
-      const tool = NcstTools.BY_ID[id];
-      if (!tool) return;
-      const li = document.createElement("li");
-      li.dataset.id = id;
+  function currentLayout() {
+    return NcstTools.normalizeLayout(state.settings && state.settings.toolbarLayout, state.settings && state.settings.toolbarItems);
+  }
+
+  function usedToolIds(layout) {
+    return new Set(NcstTools.flattenLayout(layout));
+  }
+
+  function rowHtml(entry, nested) {
+    const li = document.createElement("li");
+    if (nested) li.className = "nest";
+    if (entry.t === "divider") {
+      li.dataset.kind = "divider";
       li.innerHTML =
-        '<input type="checkbox"' +
-        (enabled.has(id) ? " checked" : "") +
-        ' /><span class="tool-label">' +
+        (NcstTools.ICONS.divider || "") +
+        '<span class="tool-label">Vertical divider</span>' +
+        '<button type="button" class="tool-move" data-act="remove">✕</button>' +
+        '<button type="button" class="tool-move" data-move="up">↑</button>' +
+        '<button type="button" class="tool-move" data-move="down">↓</button>';
+      return li;
+    }
+    if (entry.t === "tool") {
+      const tool = NcstTools.BY_ID[entry.id];
+      if (!tool) return null;
+      li.dataset.kind = "tool";
+      li.dataset.id = entry.id;
+      li.innerHTML =
+        '<span class="tool-icon">' +
+        (tool.icon || "") +
+        '</span><input type="checkbox" checked /><span class="tool-label">' +
+        tool.label +
+        '</span><button type="button" class="tool-move" data-move="up">↑</button><button type="button" class="tool-move" data-move="down">↓</button>';
+      return li;
+    }
+    if (entry.t === "group" || entry.t === "dropdown") {
+      li.dataset.kind = entry.t;
+      const icon = entry.t === "dropdown" ? NcstTools.ICONS.dropdown : NcstTools.ICONS.group;
+      const labelInput =
+        entry.t === "dropdown"
+          ? '<input type="text" data-dd-label value="' +
+            String(entry.label || "Menu").replace(/"/g, "&quot;") +
+            '" />'
+          : '<span class="tool-label">Button group</span>';
+      li.innerHTML =
+        '<span class="tool-icon">' +
+        icon +
+        "</span>" +
+        labelInput +
+        '<button type="button" class="tool-move" data-act="ungroup">Ungroup</button>' +
+        '<button type="button" class="tool-move" data-move="up">↑</button>' +
+        '<button type="button" class="tool-move" data-move="down">↓</button>';
+      const sub = document.createElement("ul");
+      entry.items.forEach((id) => {
+        const child = rowHtml({ t: "tool", id }, true);
+        if (child) {
+          child.querySelector("input").checked = true;
+          sub.appendChild(child);
+        }
+      });
+      li.appendChild(sub);
+      return li;
+    }
+    return null;
+  }
+
+  function paintCustomizer(layout) {
+    toolbarToolList.innerHTML = "";
+    layout.forEach((entry) => {
+      const row = rowHtml(entry, false);
+      if (row) toolbarToolList.appendChild(row);
+    });
+    const used = usedToolIds(layout);
+    NcstTools.CATALOG.forEach((tool) => {
+      if (used.has(tool.id)) return;
+      const li = document.createElement("li");
+      li.dataset.kind = "tool";
+      li.dataset.id = tool.id;
+      li.innerHTML =
+        '<span class="tool-icon">' +
+        (tool.icon || "") +
+        '</span><input type="checkbox" /><span class="tool-label">' +
         tool.label +
         '</span><button type="button" class="tool-move" data-move="up">↑</button><button type="button" class="tool-move" data-move="down">↓</button>';
       toolbarToolList.appendChild(li);
     });
+  }
+
+  function collectLayout() {
+    const layout = [];
+    [...toolbarToolList.children].forEach((li) => {
+      const kind = li.dataset.kind;
+      if (kind === "divider") {
+        layout.push({ t: "divider" });
+        return;
+      }
+      if (kind === "tool") {
+        const box = li.querySelector("input[type='checkbox']");
+        if (box && box.checked && li.dataset.id) layout.push({ t: "tool", id: li.dataset.id });
+        return;
+      }
+      if (kind === "group" || kind === "dropdown") {
+        const items = [...li.querySelectorAll(":scope > ul > li[data-id]")]
+          .filter((row) => {
+            const box = row.querySelector("input[type='checkbox']");
+            return box && box.checked;
+          })
+          .map((row) => row.dataset.id);
+        if (!items.length) return;
+        if (kind === "dropdown") {
+          const labelEl = li.querySelector("[data-dd-label]");
+          layout.push({ t: "dropdown", label: (labelEl && labelEl.value) || "Menu", items });
+        } else layout.push({ t: "group", items });
+      }
+    });
+    return NcstTools.normalizeLayout(layout, NcstTools.DEFAULT_ITEMS);
+  }
+
+  function openToolbarModal() {
+    paintCustomizer(currentLayout());
     toolbarModal.classList.remove("hidden");
   }
 
@@ -356,16 +549,31 @@
     toolbarModal.classList.add("hidden");
   }
 
-  function collectToolbarItems() {
-    return [...toolbarToolList.querySelectorAll("li")]
-      .filter((li) => li.querySelector("input").checked)
+  function saveToolbarLayout(layout) {
+    const next = NcstTools.normalizeLayout(layout);
+    renderToolbar(next);
+    persist({ toolbarLayout: next, toolbarItems: NcstTools.flattenLayout(next) });
+  }
+
+  function selectedTopTools() {
+    return [...toolbarToolList.children]
+      .filter((li) => li.dataset.kind === "tool" && li.querySelector("input") && li.querySelector("input").checked)
       .map((li) => li.dataset.id);
   }
 
-  function saveToolbarItems(items) {
-    const next = NcstTools.normalizeItems(items);
-    renderToolbar(next);
-    persist({ toolbarItems: next });
+  function wrapSelected(kind) {
+    const ids = selectedTopTools();
+    if (ids.length < 2) return;
+    const layout = collectLayout();
+    const firstIndex = layout.findIndex((e) => e.t === "tool" && e.id === ids[0]);
+    const without = layout.filter((e) => !(e.t === "tool" && ids.includes(e.id)));
+    const at = firstIndex < 0 ? without.length : Math.min(firstIndex, without.length);
+    const block =
+      kind === "dropdown"
+        ? { t: "dropdown", label: (NcstTools.BY_ID[ids[0]] && NcstTools.BY_ID[ids[0]].label) || "Menu", items: ids }
+        : { t: "group", items: ids };
+    without.splice(at, 0, block);
+    paintCustomizer(NcstTools.normalizeLayout(without));
   }
 
   function renderRecent(paths) {
@@ -397,7 +605,7 @@
   async function maybeSaveChoice(choice) {
     if (choice === "cancel") return false;
     if (choice === "save") {
-      const result = await host.saveFile(currentMarkdown());
+      const result = await host.saveFile(currentMarkdown(), suggestedFileName());
       if (!result || result.canceled) return false;
       applyOpened(result);
     }
@@ -436,11 +644,11 @@
   }
 
   async function cmdSave() {
-    applyOpened(await host.saveFile(currentMarkdown()));
+    applyOpened(await host.saveFile(currentMarkdown(), suggestedFileName()));
   }
 
   async function cmdSaveAs() {
-    applyOpened(await host.saveFileAs(currentMarkdown()));
+    applyOpened(await host.saveFileAs(currentMarkdown(), suggestedFileName()));
   }
 
   function cmdLive() {
@@ -571,29 +779,48 @@
   optCustomizeToolbar.addEventListener("click", () => openToolbarModal());
   document.getElementById("toolbar-modal-close").addEventListener("click", closeToolbarModal);
   document.getElementById("toolbar-done").addEventListener("click", () => {
-    saveToolbarItems(collectToolbarItems());
+    saveToolbarLayout(collectLayout());
     closeToolbarModal();
   });
   document.getElementById("toolbar-reset").addEventListener("click", () => {
-    saveToolbarItems(NcstTools.DEFAULT_ITEMS.slice());
-    openToolbarModal();
+    saveToolbarLayout(NcstTools.DEFAULT_LAYOUT);
+    paintCustomizer(NcstTools.DEFAULT_LAYOUT);
   });
+  document.getElementById("toolbar-add-divider").addEventListener("click", () => {
+    const next = collectLayout();
+    next.push({ t: "divider" });
+    paintCustomizer(next);
+  });
+  document.getElementById("toolbar-make-group").addEventListener("click", () => wrapSelected("group"));
+  document.getElementById("toolbar-make-dropdown").addEventListener("click", () => wrapSelected("dropdown"));
   toolbarToolList.addEventListener("click", (e) => {
-    const move = e.target.getAttribute("data-move");
-    if (!move) return;
     const li = e.target.closest("li");
     if (!li) return;
-    if (move === "up" && li.previousElementSibling) {
-      toolbarToolList.insertBefore(li, li.previousElementSibling);
-    } else if (move === "down" && li.nextElementSibling) {
-      toolbarToolList.insertBefore(li.nextElementSibling, li);
+    const act = e.target.getAttribute("data-act");
+    if (act === "remove") {
+      li.remove();
+      return;
     }
+    if (act === "ungroup") {
+      const kids = [...li.querySelectorAll(":scope > ul > li")];
+      kids.forEach((kid) => li.parentNode.insertBefore(kid, li));
+      li.remove();
+      return;
+    }
+    const move = e.target.getAttribute("data-move");
+    if (!move) return;
+    const parent = li.parentNode;
+    const siblings = [...parent.children].filter((n) => n.tagName === "LI");
+    const idx = siblings.indexOf(li);
+    if (move === "up" && idx > 0) parent.insertBefore(li, siblings[idx - 1]);
+    else if (move === "down" && idx >= 0 && idx < siblings.length - 1) parent.insertBefore(siblings[idx + 1], li);
   });
 
   document.addEventListener("click", (e) => {
     if (!ctx.contains(e.target)) hideCtx();
     if (!headingMenu.contains(e.target) && !e.target.closest("#gutter")) hideHeadingMenu();
     if (e.target === toolbarModal) closeToolbarModal();
+    if (!e.target.closest(".toolbar-dd")) closeToolbarMenus();
   });
 
   drawerToggle.addEventListener("click", () => {
@@ -617,7 +844,27 @@
 
   toolbar.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-fmt]");
-    if (btn) runFormat(btn.getAttribute("data-fmt"));
+    if (btn) {
+      runFormat(btn.getAttribute("data-fmt"));
+      closeToolbarMenus();
+    }
+  });
+
+  docTitle.addEventListener("input", () => {
+    state.titleEdited = true;
+    state.docTitle = (docTitle.textContent || "").replace(/\s+/g, " ").trim() || "Untitled";
+    syncTitle();
+  });
+  docTitle.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      docTitle.blur();
+    }
+  });
+  docTitle.addEventListener("blur", () => {
+    setDocTitle(docTitle.textContent, false);
+    state.titleEdited = true;
+    syncTitle();
   });
 
   optToolbar.addEventListener("change", () => {
@@ -684,7 +931,7 @@
   });
 
   host.onSaveThenQuit(async () => {
-    const result = await host.saveFile(currentMarkdown());
+    const result = await host.saveFile(currentMarkdown(), suggestedFileName());
     if (result && !result.canceled && !result.error) {
       applyOpened(result);
       host.allowClose();
@@ -695,7 +942,7 @@
     const choice = await confirmIfDirty();
     if (choice === "cancel") return;
     if (choice === "save") {
-      const result = await host.saveFile(currentMarkdown());
+      const result = await host.saveFile(currentMarkdown(), suggestedFileName());
       if (!result || result.canceled || result.error) return;
       applyOpened(result);
     }

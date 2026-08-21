@@ -27,8 +27,17 @@ test("keeps custom toolbar order and drops unknown tools", () => {
   assert.deepEqual(s.toolbarItems, ["table", "bold"]);
 });
 
-test("empty toolbar items fall back to defaults", () => {
+test("empty toolbar items fall back to default layout tools", () => {
   const s = normalizeSettings({ toolbarItems: [] });
   assert.ok(s.toolbarItems.includes("bold"));
-  assert.ok(s.toolbarItems.includes("heading"));
+  assert.ok(s.toolbarItems.includes("h1"));
+  assert.ok(s.toolbarLayout.some((e) => e.t === "dropdown"));
+});
+
+test("migrates a flat toolbarItems list to layout tools", () => {
+  const s = normalizeSettings({ toolbarItems: ["bold", "table"] });
+  assert.deepEqual(
+    s.toolbarLayout.filter((e) => e.t === "tool").map((e) => e.id),
+    ["bold", "table"]
+  );
 });

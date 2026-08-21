@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/markdown.test.js tests/settings.test.js tests/format.test.js",
+    "test": "node --test tests/markdown.test.js tests/settings.test.js tests/format.test.js tests/files.test.js",
     "build:live": "node scripts/build-live.mjs",
     "prepare": "node scripts/build-live.mjs",
     "launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1",

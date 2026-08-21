@@ -127,17 +127,19 @@ ipcMain.handle("file:openPath", async (_e, filePath) => {
   }
 });
 
-ipcMain.handle("file:save", async (_e, content) => {
+ipcMain.handle("file:save", async (_e, content, suggestedName) => {
   if (!currentPath) {
-    const result = await files.saveDialog(mainWindow, content, "untitled.md");
+    const defaultPath = files.suggestedSavePath(null, suggestedName, "markdown");
+    const result = await files.saveDialog(mainWindow, content, defaultPath);
     return filePayload(result ? { ...result, content } : null);
   }
   const result = files.writeFile(currentPath, content);
   return filePayload({ ...result, content });
 });
 
-ipcMain.handle("file:saveAs", async (_e, content) => {
-  const result = await files.saveDialog(mainWindow, content, currentPath || "untitled.md");
+ipcMain.handle("file:saveAs", async (_e, content, suggestedName) => {
+  const defaultPath = files.suggestedSavePath(currentPath, suggestedName, files.kindFromPath(currentPath));
+  const result = await files.saveDialog(mainWindow, content, defaultPath);
   return filePayload(result ? { ...result, content } : null);
 });
 
