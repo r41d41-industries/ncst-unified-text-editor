@@ -26,8 +26,11 @@
           <button type="button" data-cmd="saveAs" title="Save As">
             <span class="icon" aria-hidden="true">📄</span><span class="label">Save As</span>
           </button>
-          <button type="button" id="btn-preview" data-cmd="preview" title="Preview">
-            <span class="icon" aria-hidden="true">👁</span><span class="label">Preview</span>
+          <button type="button" id="btn-live" data-cmd="live" title="Live Preview">
+            <span class="icon" aria-hidden="true">✎</span><span class="label">Live</span>
+          </button>
+          <button type="button" id="btn-preview" data-cmd="reading" title="Reading view">
+            <span class="icon" aria-hidden="true">👁</span><span class="label">Reading</span>
           </button>
           <button type="button" id="btn-options" data-cmd="options" title="Options">
             <span class="icon" aria-hidden="true">⚙</span><span class="label">Options</span>
@@ -62,6 +65,7 @@
           <button type="button" data-fmt="hr" title="Horizontal rule">—</button>
         </div>
         <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
+        <div id="live" class="hidden"></div>
         <div id="preview" class="hidden"></div>
       </div>
     </div>
@@ -70,6 +74,7 @@
     <script src="markdown.js"></script>
     <script src="format.js"></script>
     <script src="context-menu.js"></script>
+    <script src="live-preview.bundle.js"></script>
     <script src="editor.js"></script>
   </body>
 </html>

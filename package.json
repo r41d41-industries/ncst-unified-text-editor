@@ -7,14 +7,22 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/markdown.test.js",
+    "test": "node --test tests/markdown.test.js tests/settings.test.js",
+    "build:live": "node scripts/build-live.mjs",
+    "prepare": "node scripts/build-live.mjs",
     "launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1",
     "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop-shortcut.ps1"
   },
   "dependencies": {
+    "@tiptap/core": "^3.30.2",
+    "@tiptap/extension-list": "^3.30.2",
+    "@tiptap/extension-table": "^3.30.2",
+    "@tiptap/markdown": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {
-    "electron": "^37.2.6"
+    "electron": "^37.2.6",
+    "esbuild": "^0.28.2"
   }
 }

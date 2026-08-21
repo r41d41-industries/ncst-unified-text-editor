@@ -9,8 +9,10 @@ Electron markdown/text editor for local `.md` and `.txt` files. Standalone app, 
 - Right-click format menu, date/time insert, and spell suggestions
 - Collapsible left drawer with icon links and Options
 - Obsidian-style markdown subset (GFM, wikilinks, callouts, YAML frontmatter, `#tags`)
-- Edit / Preview toggle (markdown → HTML; `.txt` is escaped plain text)
+- Three views: **Source** (raw markdown), **Live** (edit inside formatted lists/tables), **Reading** (HTML)
+- Live Preview: Enter continues a list, Tab / Shift+Tab indent or outdent, type in table cells
 - Custom spellcheck dictionary (add / ignore)
+- `.txt` files stay Source / Reading (no Live)
 
 ## Setup
 
@@ -45,3 +47,5 @@ Copy the `editor/` folder and expose the same host API from your preload (see `e
 ## Settings
 
 Stored in Electron `userData` (`settings.json`, `custom-dictionary.json`). Date insert default is `MM/DD/YY`; time `h:mm A`; combined `{date} {time}`.
+
+View shortcuts: **Ctrl+E** cycles Source → Live → Reading. Drawer **Live** / **Reading** buttons toggle that mode off back to Source.

@@ -1,10 +1,12 @@
 (() => {
   const editor = document.getElementById("editor");
   const preview = document.getElementById("preview");
+  const liveEl = document.getElementById("live");
   const drawer = document.getElementById("drawer");
   const drawerToggle = document.getElementById("drawer-toggle");
   const toolbar = document.getElementById("toolbar");
   const optionsPanel = document.getElementById("options-panel");
+  const btnLive = document.getElementById("btn-live");
   const btnPreview = document.getElementById("btn-preview");
   const btnOptions = document.getElementById("btn-options");
   const optToolbar = document.getElementById("opt-toolbar");
@@ -31,15 +33,41 @@
     kind: "markdown",
     savedContent: "",
     dirty: false,
-    preview: false,
+    mode: "source",
     optionsOpen: false,
     misspelled: "",
     settings: null,
+    frontmatter: null,
   };
+
+  let liveHandle = null;
 
   function basename(filePath) {
     if (!filePath) return "Untitled";
     return filePath.split(/[/\\]/).pop();
+  }
+
+  function joinFrontmatter(frontmatter, body) {
+    if (frontmatter == null || frontmatter === "") return body == null ? "" : String(body);
+    const bodyText = body == null ? "" : String(body);
+    return "---\n" + frontmatter + "\n---\n" + bodyText;
+  }
+
+  function splitSource(src) {
+    return NcstMarkdown.splitFrontmatter(src == null ? "" : String(src));
+  }
+
+  function currentMarkdown() {
+    if (state.mode === "live" && liveHandle) {
+      return joinFrontmatter(state.frontmatter, liveHandle.getMarkdown());
+    }
+    return editor.value;
+  }
+
+  function syncLiveToTextarea() {
+    if (state.mode === "live" && liveHandle) {
+      editor.value = joinFrontmatter(state.frontmatter, liveHandle.getMarkdown());
+    }
   }
 
   function syncTitle() {
@@ -49,40 +77,90 @@
   }
 
   function markDirty() {
-    const next = editor.value !== state.savedContent;
+    const next = currentMarkdown() !== state.savedContent;
     if (next !== state.dirty) {
       state.dirty = next;
       syncTitle();
     }
   }
 
-  function setContent(content, filePath, kind) {
-    editor.value = content == null ? "" : String(content);
-    state.path = filePath || null;
-    state.kind = kind || (filePath && filePath.toLowerCase().endsWith(".txt") ? "text" : "markdown");
-    state.savedContent = editor.value;
-    state.dirty = false;
-    if (state.preview) renderPreview();
-    syncTitle();
-  }
-
   function renderPreview() {
+    const src = currentMarkdown();
     if (state.kind === "text") {
-      preview.innerHTML = NcstMarkdown.plainTextToHtml(editor.value);
+      preview.innerHTML = NcstMarkdown.plainTextToHtml(src);
     } else {
-      preview.innerHTML = NcstMarkdown.markdownToHtml(editor.value);
+      preview.innerHTML = NcstMarkdown.markdownToHtml(src);
     }
   }
 
-  function setPreview(on) {
-    state.preview = !!on;
-    editor.classList.toggle("hidden", state.preview);
-    preview.classList.toggle("hidden", !state.preview);
-    btnPreview.classList.toggle("active", state.preview);
+  function canLive() {
+    return state.kind !== "text" && window.NcstLive && typeof window.NcstLive.mount === "function";
+  }
+
+  function ensureLive(body) {
+    if (!canLive()) return null;
+    if (!liveHandle) {
+      liveHandle = window.NcstLive.mount({
+        element: liveEl,
+        markdown: body || "",
+        spellcheck: optSpell.checked,
+        onUpdate: () => markDirty(),
+      });
+    } else {
+      liveHandle.setMarkdown(body || "");
+      liveHandle.setSpellcheck(optSpell.checked);
+    }
+    return liveHandle;
+  }
+
+  function applyModeChrome() {
+    const mode = state.mode;
+    editor.classList.toggle("hidden", mode !== "source");
+    liveEl.classList.toggle("hidden", mode !== "live");
+    preview.classList.toggle("hidden", mode !== "reading");
+    btnLive.classList.toggle("active", mode === "live");
+    btnPreview.classList.toggle("active", mode === "reading");
+    btnLive.disabled = state.kind === "text";
     toolbar.querySelectorAll("button").forEach((b) => {
-      b.disabled = state.preview;
+      b.disabled = mode === "reading";
     });
-    if (state.preview) renderPreview();
+  }
+
+  function setMode(next, persistIt) {
+    let mode = next || "source";
+    if (mode === "live" && !canLive()) mode = "source";
+    if (state.mode === "live" && mode !== "live") syncLiveToTextarea();
+    state.mode = mode;
+    if (mode === "live") {
+      const split = splitSource(editor.value);
+      state.frontmatter = split.frontmatter;
+      ensureLive(split.body);
+    } else if (mode === "reading") {
+      renderPreview();
+    } else {
+      const split = splitSource(editor.value);
+      state.frontmatter = split.frontmatter;
+    }
+    applyModeChrome();
+    if (mode === "live" && liveHandle) liveHandle.focus();
+    else if (mode === "source") editor.focus();
+    if (persistIt !== false) persist({ viewMode: mode, preview: mode === "reading" });
+  }
+
+  function setContent(content, filePath, kind) {
+    const text = content == null ? "" : String(content);
+    editor.value = text;
+    state.path = filePath || null;
+    state.kind = kind || (filePath && filePath.toLowerCase().endsWith(".txt") ? "text" : "markdown");
+    const split = splitSource(text);
+    state.frontmatter = split.frontmatter;
+    state.savedContent = text;
+    state.dirty = false;
+    let mode = state.mode;
+    if (state.kind === "text" && mode === "live") mode = "source";
+    if (mode === "live") ensureLive(split.body);
+    setMode(mode, false);
+    syncTitle();
   }
 
   function setDrawerOpen(open) {
@@ -102,11 +180,12 @@
     setToolbarVisible(settings.toolbarVisible !== false);
     optSpell.checked = settings.spellcheck !== false;
     editor.spellcheck = settings.spellcheck !== false;
+    if (liveHandle) liveHandle.setSpellcheck(settings.spellcheck !== false);
     optDate.value = settings.dateFormat || "MM/DD/YY";
     optTime.value = settings.timeFormat || "h:mm A";
     optCombined.value = settings.combinedFormat || "{date} {time}";
-    setPreview(!!settings.preview);
     renderRecent(settings.recentFiles || []);
+    state.mode = settings.viewMode || "source";
   }
 
   function persist(partial) {
@@ -146,7 +225,7 @@
   async function maybeSaveChoice(choice) {
     if (choice === "cancel") return false;
     if (choice === "save") {
-      const result = await host.saveFile(editor.value);
+      const result = await host.saveFile(currentMarkdown());
       if (!result || result.canceled) return false;
       applyOpened(result);
     }
@@ -185,16 +264,29 @@
   }
 
   async function cmdSave() {
-    applyOpened(await host.saveFile(editor.value));
+    applyOpened(await host.saveFile(currentMarkdown()));
   }
 
   async function cmdSaveAs() {
-    applyOpened(await host.saveFileAs(editor.value));
+    applyOpened(await host.saveFileAs(currentMarkdown()));
   }
 
-  function cmdPreview() {
-    setPreview(!state.preview);
-    persist({ preview: state.preview });
+  function cmdLive() {
+    setMode(state.mode === "live" ? "source" : "live");
+  }
+
+  function cmdReading() {
+    setMode(state.mode === "reading" ? "source" : "reading");
+  }
+
+  function cycleMode() {
+    if (state.kind === "text") {
+      setMode(state.mode === "reading" ? "source" : "reading");
+      return;
+    }
+    const order = ["source", "live", "reading"];
+    const idx = order.indexOf(state.mode);
+    setMode(order[(idx + 1) % order.length]);
   }
 
   function cmdOptions() {
@@ -217,12 +309,25 @@
     NcstContextMenu.place(ctx, x, y);
   }
 
+  function runFormat(action) {
+    if (state.mode === "reading") return;
+    if (state.mode === "live" && liveHandle) {
+      liveHandle.run(action);
+      return;
+    }
+    NcstFormat.run(action, editor);
+  }
+
   async function onMenuAction(action) {
     hideCtx();
     if (action === "noop") return;
-    if (state.preview && !action.startsWith("edit:")) return;
+    if (state.mode === "reading" && !action.startsWith("edit:")) return;
     if (action.startsWith("suggest:")) {
-      NcstFormat.replaceWordAt(editor, state.misspelled, action.slice(8));
+      if (state.mode === "live" && liveHandle) {
+        liveHandle.insertText(action.slice(8));
+      } else {
+        NcstFormat.replaceWordAt(editor, state.misspelled, action.slice(8));
+      }
       return;
     }
     if (action === "dict:add" && state.misspelled) {
@@ -247,15 +352,16 @@
     }
     if (action.startsWith("dt:")) {
       const text = await host.formatDateTime(action.slice(3));
-      NcstFormat.insertAtCaret(editor, text);
+      if (state.mode === "live" && liveHandle) liveHandle.insertText(text);
+      else NcstFormat.insertAtCaret(editor, text);
       return;
     }
-    NcstFormat.run(action, editor);
+    runFormat(action);
   }
 
   editor.addEventListener("input", () => {
     markDirty();
-    if (state.preview) renderPreview();
+    if (state.mode === "reading") renderPreview();
   });
 
   document.addEventListener("click", (e) => {
@@ -275,16 +381,14 @@
       else if (cmd === "open") cmdOpen();
       else if (cmd === "save") cmdSave();
       else if (cmd === "saveAs") cmdSaveAs();
-      else if (cmd === "preview") cmdPreview();
+      else if (cmd === "live") cmdLive();
+      else if (cmd === "reading") cmdReading();
       else if (cmd === "options") cmdOptions();
     });
   });
 
   toolbar.querySelectorAll("[data-fmt]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (state.preview) return;
-      NcstFormat.run(btn.getAttribute("data-fmt"), editor);
-    });
+    btn.addEventListener("click", () => runFormat(btn.getAttribute("data-fmt")));
   });
 
   optToolbar.addEventListener("change", () => {
@@ -293,6 +397,7 @@
   });
   optSpell.addEventListener("change", () => {
     editor.spellcheck = optSpell.checked;
+    if (liveHandle) liveHandle.setSpellcheck(optSpell.checked);
     persist({ spellcheck: optSpell.checked });
   });
   function saveFormats() {
@@ -322,16 +427,16 @@
       cmdSave();
     } else if (ctrl && e.key === "e") {
       e.preventDefault();
-      cmdPreview();
+      cycleMode();
     } else if (ctrl && e.key === "\\") {
       e.preventDefault();
       const open = !drawer.classList.contains("open");
       setDrawerOpen(open);
       persist({ drawerOpen: open });
-    } else if (ctrl && e.key === "b" && !state.preview) {
+    } else if (ctrl && e.key === "b" && state.mode === "source") {
       e.preventDefault();
       NcstFormat.run("bold", editor);
-    } else if (ctrl && e.key === "i" && !state.preview) {
+    } else if (ctrl && e.key === "i" && state.mode === "source") {
       e.preventDefault();
       NcstFormat.run("italic", editor);
     } else if (e.key === "Escape") {
@@ -340,12 +445,12 @@
   });
 
   host.onSpellContext((payload) => {
-    if (state.preview || (payload && payload.isEditable === false)) return;
+    if (state.mode === "reading" || (payload && payload.isEditable === false)) return;
     showCtx(payload, payload.x || 0, payload.y || 0);
   });
 
   host.onSaveThenQuit(async () => {
-    const result = await host.saveFile(editor.value);
+    const result = await host.saveFile(currentMarkdown());
     if (result && !result.canceled && !result.error) {
       applyOpened(result);
       host.allowClose();
@@ -356,7 +461,7 @@
     const choice = await confirmIfDirty();
     if (choice === "cancel") return;
     if (choice === "save") {
-      const result = await host.saveFile(editor.value);
+      const result = await host.saveFile(currentMarkdown());
       if (!result || result.canceled || result.error) return;
       applyOpened(result);
     }

@@ -6,7 +6,7 @@ Reusable renderer for NCST Unified Text Editor. The shell (`main.js` / `preload.
 
 `BrowserWindow` → `loadFile(.../editor/index.html)` with `contextIsolation: true` and a preload that exposes `window.api`.
 
-Scripts expect `../node_modules/markdown-it/dist/markdown-it.min.js` relative to `editor/`.
+Scripts expect `../node_modules/markdown-it/dist/markdown-it.min.js` relative to `editor/`, plus `live-preview.bundle.js` (built from `editor/live/index.js` via `npm run build:live`).
 
 ## `window.api` contract
 
