@@ -23315,12 +23315,12 @@ ${prefix}
         if (before || after) {
           let node = this.editorView.nodeDOM(this.cursorPos - (before ? before.nodeSize : 0));
           if (node) {
-            let nodeRect = node.getBoundingClientRect();
-            let top = before ? nodeRect.bottom : nodeRect.top;
+            let nodeRect2 = node.getBoundingClientRect();
+            let top = before ? nodeRect2.bottom : nodeRect2.top;
             if (before && after)
               top = (top + this.editorView.nodeDOM(this.cursorPos).getBoundingClientRect().top) / 2;
             let halfWidth = this.width / 2 * scaleY;
-            rect = { left: nodeRect.left, right: nodeRect.right, top: top - halfWidth, bottom: top + halfWidth };
+            rect = { left: nodeRect2.left, right: nodeRect2.right, top: top - halfWidth, bottom: top + halfWidth };
           }
         }
       }
@@ -30226,6 +30226,80 @@ Please report this to https://github.com/markedjs/marked.`, e) {
       height: Math.max(16, coords.bottom - coords.top)
     };
   }
+  function nodeKind(node, parent) {
+    if (node.type.name === "heading") {
+      const level = node.attrs.level || 1;
+      return { kind: "h" + level, label: "H" + level, formatted: true };
+    }
+    if (node.type.name === "listItem") {
+      if (parent && parent.type.name === "orderedList") {
+        return { kind: "ol", label: "OL", formatted: true };
+      }
+      return { kind: "ul", label: "UL", formatted: true };
+    }
+    if (node.type.name === "taskItem") return { kind: "task", label: "\u2611", formatted: true };
+    if (node.type.name === "blockquote") return { kind: "quote", label: "\u201C", formatted: true };
+    if (node.type.name === "codeBlock") return { kind: "code", label: "{}", formatted: true };
+    if (node.type.name === "paragraph") {
+      if (parent && (parent.type.name === "listItem" || parent.type.name === "taskItem" || parent.type.name === "blockquote")) {
+        return null;
+      }
+      return { kind: "paragraph", label: "P", formatted: false };
+    }
+    return null;
+  }
+  function nodeRect(view, pos, node) {
+    let dom = view.nodeDOM(pos);
+    if (dom && !(dom instanceof Element)) dom = dom.parentElement;
+    if (node.type.name === "listItem" || node.type.name === "taskItem") {
+      const inner = dom && dom.querySelector && (dom.querySelector(":scope > p, :scope > div") || dom.firstElementChild);
+      if (inner && inner.getBoundingClientRect) {
+        const r = inner.getBoundingClientRect();
+        if (r.height > 0) return r;
+      }
+    }
+    if (dom && dom.getBoundingClientRect) {
+      const r = dom.getBoundingClientRect();
+      if (r.height > 0) return r;
+    }
+    const start = view.coordsAtPos(pos + 1);
+    const endPos = Math.min(pos + node.nodeSize - 1, view.state.doc.content.size);
+    const end = view.coordsAtPos(endPos);
+    return { top: start.top, bottom: end.bottom, height: Math.max(0, end.bottom - start.top) };
+  }
+  function listGutterMarks(editor, relativeTo) {
+    const view = editor.view;
+    const origin = relativeTo.getBoundingClientRect();
+    const from2 = editor.state.selection.from;
+    const marks = [];
+    editor.state.doc.descendants((node, pos, parent) => {
+      if (node.type.name === "table") return false;
+      const kind = nodeKind(node, parent);
+      if (!kind) return true;
+      const rect = nodeRect(view, pos, node);
+      const top = rect.top - origin.top;
+      const height = Math.max(18, rect.height || 0);
+      marks.push({
+        pos,
+        end: pos + node.nodeSize,
+        kind: kind.kind,
+        label: kind.label,
+        formatted: kind.formatted,
+        top,
+        height,
+        active: from2 >= pos && from2 < pos + node.nodeSize
+      });
+      return true;
+    });
+    const actives = marks.filter((m2) => m2.active);
+    if (actives.length > 1) {
+      const inner = actives.reduce((a, b2) => a.end - a.pos <= b2.end - b2.pos ? a : b2);
+      marks.forEach((m2) => {
+        m2.active = m2 === inner;
+      });
+    }
+    return marks.filter((m2) => m2.formatted || m2.active);
+  }
   function createEditor(element, markdown, spellcheck, onUpdate, onSelection) {
     return new Editor({
       element,
@@ -30281,6 +30355,16 @@ Please report this to https://github.com/markedjs/marked.`, e) {
       },
       caretRect(relativeTo) {
         return caretRect(editor, relativeTo || element);
+      },
+      getGutterMarks(relativeTo) {
+        return listGutterMarks(editor, relativeTo || element);
+      },
+      selectPos(pos) {
+        const n = Number(pos);
+        if (!Number.isFinite(n)) return;
+        const size = editor.state.doc.content.size;
+        const target = Math.max(1, Math.min(n + 1, size));
+        editor.chain().focus().setTextSelection(target).run();
       },
       setMarkdown(markdown) {
         editor.commands.setContent(markdown || "", { contentType: "markdown", emitUpdate: false });

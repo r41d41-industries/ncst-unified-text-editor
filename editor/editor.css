@@ -195,6 +195,7 @@ body {
   width: 40px;
   flex-shrink: 0;
   position: relative;
+  overflow: hidden;
   background: var(--bg);
   border-right: 1px solid var(--border);
 }
@@ -203,11 +204,16 @@ body {
   display: none;
 }
 
+#gutter-marks {
+  position: absolute;
+  inset: 0;
+}
+
 .gutter-chip {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  height: 22px;
+  left: 3px;
+  right: 3px;
+  min-height: 18px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
@@ -216,8 +222,28 @@ body {
   font-weight: 700;
   cursor: pointer;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
+.gutter-chip.is-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #c4c4c4;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.gutter-chip.is-ghost:hover {
+  color: #8a8a8a;
+  border-color: var(--border);
+  background: var(--panel);
+}
+
+.gutter-chip.is-active:hover,
 .gutter-chip:hover {
   border-color: var(--accent);
   color: var(--accent);
@@ -310,8 +336,33 @@ body {
 
 #live .ProseMirror h1,
 #live .ProseMirror h2,
+#live .ProseMirror h3,
+#live .ProseMirror h4,
+#live .ProseMirror h5,
+#live .ProseMirror h6 {
+  margin: 0.45em 0 0.25em;
+  line-height: 1.2;
+}
+
+#live .ProseMirror h1 {
+  font-size: 2em;
+}
+
+#live .ProseMirror h2 {
+  font-size: 1.5em;
+}
+
 #live .ProseMirror h3 {
-  margin: 0.8em 0 0.4em;
+  font-size: 1.25em;
+}
+
+#live .ProseMirror h4 {
+  font-size: 1.1em;
+}
+
+#live .ProseMirror h5,
+#live .ProseMirror h6 {
+  font-size: 1em;
 }
 
 #live .ProseMirror ul,

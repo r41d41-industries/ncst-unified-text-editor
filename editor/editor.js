@@ -4,7 +4,7 @@
   const liveEl = document.getElementById("live");
   const compose = document.getElementById("compose");
   const gutter = document.getElementById("gutter");
-  const gutterChip = document.getElementById("gutter-chip");
+  const gutterMarks = document.getElementById("gutter-marks");
   const headingMenu = document.getElementById("heading-menu");
   const toolbarModal = document.getElementById("toolbar-modal");
   const toolbarToolList = document.getElementById("toolbar-tool-list");
@@ -112,7 +112,7 @@
         markdown: body || "",
         spellcheck: optSpell.checked,
         onUpdate: () => markDirty(),
-        onSelection: () => updateGutter(),
+        onSelection: () => scheduleGutter(),
       });
     } else {
       liveHandle.setMarkdown(body || "");
@@ -133,7 +133,7 @@
     toolbar.querySelectorAll("button").forEach((b) => {
       b.disabled = mode === "reading";
     });
-    updateGutter();
+    scheduleGutter();
   }
 
   function setMode(next, persistIt) {
@@ -225,64 +225,95 @@
     });
   }
 
-  function sourceLineInfo() {
-    const value = editor.value;
-    const pos = editor.selectionStart;
-    const lineStart = value.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
-    let lineEnd = value.indexOf("\n", pos);
-    if (lineEnd < 0) lineEnd = value.length;
-    const line = value.slice(lineStart, lineEnd);
-    const lineIndex = (value.slice(0, lineStart).match(/\n/g) || []).length;
+  function sourceLineKind(line) {
     const level = NcstFormat.headingLevelOfLine(line);
-    return {
-      line,
-      lineIndex,
-      kind: level ? "h" + level : "paragraph",
-      label: level ? "H" + level : "P",
-    };
+    if (level) return { kind: "h" + level, label: "H" + level, formatted: true };
+    if (/^\s*[-*+]\s+\[[ xX]\]/.test(line)) return { kind: "task", label: "☑", formatted: true };
+    if (/^\s*\d+\.\s+/.test(line)) return { kind: "ol", label: "OL", formatted: true };
+    if (/^\s*[-*+]\s+/.test(line)) return { kind: "ul", label: "UL", formatted: true };
+    if (/^\s*>/.test(line)) return { kind: "quote", label: "“", formatted: true };
+    return { kind: "paragraph", label: "P", formatted: false };
+  }
+
+  function sourceGutterMarks() {
+    const value = editor.value;
+    const caret = editor.selectionStart;
+    const caretLine = (value.slice(0, caret).match(/\n/g) || []).length;
+    const cs = window.getComputedStyle(editor);
+    const lineHeight = parseFloat(cs.lineHeight) || 21;
+    const paddingTop = parseFloat(cs.paddingTop) || 0;
+    const lines = value.split("\n");
+    const marks = [];
+    lines.forEach((line, i) => {
+      const info = sourceLineKind(line);
+      const active = i === caretLine;
+      if (!info.formatted && !active) return;
+      marks.push({
+        lineIndex: i,
+        kind: info.kind,
+        label: info.label,
+        formatted: info.formatted,
+        active,
+        top: paddingTop + i * lineHeight - editor.scrollTop,
+        height: lineHeight,
+      });
+    });
+    return marks;
+  }
+
+  function paintGutterMarks(marks) {
+    gutterMarks.innerHTML = "";
+    const viewH = compose.clientHeight || 0;
+    marks.forEach((mark) => {
+      if (mark.top + mark.height < -8 || mark.top > viewH + 8) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "gutter-chip" + (mark.active ? " is-active" : " is-ghost");
+      btn.textContent = mark.label;
+      btn.title = mark.active ? "Set heading or paragraph" : mark.label;
+      btn.dataset.kind = mark.kind;
+      if (mark.pos != null) btn.dataset.pos = String(mark.pos);
+      if (mark.lineIndex != null) btn.dataset.line = String(mark.lineIndex);
+      btn.style.top = Math.round(mark.top) + "px";
+      btn.style.height = Math.round(mark.height) + "px";
+      gutterMarks.appendChild(btn);
+    });
   }
 
   function updateGutter() {
     if (state.mode === "reading") {
-      gutterChip.classList.add("hidden");
+      gutterMarks.innerHTML = "";
       return;
     }
     if (state.mode === "live" && liveHandle) {
       try {
-        const info = liveHandle.getBlockInfo();
-        gutterChip.textContent = info.label;
-        gutterChip.dataset.kind = info.kind;
-        const rect = liveHandle.caretRect(compose);
-        gutterChip.style.top = Math.max(4, rect.top - 2) + "px";
-        gutterChip.classList.remove("hidden");
+        paintGutterMarks(liveHandle.getGutterMarks(compose));
       } catch {
-        gutterChip.classList.add("hidden");
+        gutterMarks.innerHTML = "";
       }
       return;
     }
     if (state.mode === "source") {
-      const info = sourceLineInfo();
-      gutterChip.textContent = info.label;
-      gutterChip.dataset.kind = info.kind;
-      const cs = window.getComputedStyle(editor);
-      const lineHeight = parseFloat(cs.lineHeight) || 21;
-      const paddingTop = parseFloat(cs.paddingTop) || 0;
-      const top = paddingTop + info.lineIndex * lineHeight - editor.scrollTop;
-      gutterChip.style.top = Math.max(4, top) + "px";
-      gutterChip.classList.toggle("hidden", top < -8 || top > compose.clientHeight);
+      paintGutterMarks(sourceGutterMarks());
       return;
     }
-    gutterChip.classList.add("hidden");
+    gutterMarks.innerHTML = "";
+  }
+
+  function scheduleGutter() {
+    requestAnimationFrame(updateGutter);
   }
 
   function hideHeadingMenu() {
     headingMenu.classList.add("hidden");
   }
 
-  function showHeadingMenu() {
+  function showHeadingMenu(anchor) {
     hideCtx();
-    const chipRect = gutterChip.getBoundingClientRect();
+    const chip = anchor || gutterMarks.querySelector(".gutter-chip.is-active") || gutterMarks.querySelector(".gutter-chip");
+    if (!chip) return;
     headingMenu.classList.remove("hidden");
+    const chipRect = chip.getBoundingClientRect();
     const menuRect = headingMenu.getBoundingClientRect();
     let left = chipRect.right + 4;
     let top = chipRect.top;
@@ -295,7 +326,7 @@
   function applyBlockKind(kind) {
     if (state.mode === "live" && liveHandle) liveHandle.run(kind);
     else NcstFormat.run(kind, editor);
-    updateGutter();
+    scheduleGutter();
   }
 
   function openToolbarModal() {
@@ -503,18 +534,30 @@
   editor.addEventListener("input", () => {
     markDirty();
     if (state.mode === "reading") renderPreview();
-    updateGutter();
+    scheduleGutter();
   });
-  editor.addEventListener("keyup", updateGutter);
-  editor.addEventListener("click", updateGutter);
-  editor.addEventListener("scroll", updateGutter);
-  liveEl.addEventListener("scroll", updateGutter);
+  editor.addEventListener("keyup", scheduleGutter);
+  editor.addEventListener("click", scheduleGutter);
+  editor.addEventListener("scroll", scheduleGutter);
+  liveEl.addEventListener("scroll", scheduleGutter);
 
-  gutterChip.addEventListener("click", (e) => {
+  gutterMarks.addEventListener("click", (e) => {
+    const chip = e.target.closest(".gutter-chip");
+    if (!chip) return;
     e.preventDefault();
     e.stopPropagation();
-    if (headingMenu.classList.contains("hidden")) showHeadingMenu();
-    else hideHeadingMenu();
+    if (state.mode === "live" && liveHandle && chip.dataset.pos != null) {
+      liveHandle.selectPos(chip.dataset.pos);
+    } else if (state.mode === "source" && chip.dataset.line != null) {
+      const lines = editor.value.split("\n");
+      let pos = 0;
+      const target = Number(chip.dataset.line);
+      for (let i = 0; i < target && i < lines.length; i += 1) pos += lines[i].length + 1;
+      editor.focus();
+      editor.setSelectionRange(pos, pos);
+    }
+    scheduleGutter();
+    showHeadingMenu(chip);
   });
 
   headingMenu.addEventListener("click", (e) => {
@@ -549,7 +592,7 @@
 
   document.addEventListener("click", (e) => {
     if (!ctx.contains(e.target)) hideCtx();
-    if (!headingMenu.contains(e.target) && e.target !== gutterChip) hideHeadingMenu();
+    if (!headingMenu.contains(e.target) && !e.target.closest("#gutter")) hideHeadingMenu();
     if (e.target === toolbarModal) closeToolbarModal();
   });
 
