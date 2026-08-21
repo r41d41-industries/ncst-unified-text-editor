@@ -6,6 +6,7 @@ const { loadWords, addWord, applyToSession } = require("./lib/dictionary");
 const files = require("./lib/files");
 
 let mainWindow = null;
+let settingsWindow = null;
 let currentPath = null;
 let dirty = false;
 let allowClose = false;
@@ -143,11 +144,57 @@ ipcMain.handle("file:saveAs", async (_e, content, suggestedName) => {
   return filePayload(result ? { ...result, content } : null);
 });
 
+function broadcastSettings(next) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("settings:changed", next);
+  if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send("settings:changed", next);
+}
+
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 680,
+    height: 740,
+    minWidth: 520,
+    minHeight: 480,
+    title: "Settings",
+    parent: mainWindow || undefined,
+    autoHideMenuBar: true,
+    backgroundColor: "#ffffff",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  settingsWindow.loadFile(path.join(__dirname, "editor", "settings.html"));
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
+}
+
 ipcMain.handle("settings:get", () => getSettings());
 
 ipcMain.handle("settings:set", (_e, partial) => {
   const current = getSettings();
-  return saveSettings(userData(), { ...current, ...(partial || {}) });
+  const next = saveSettings(userData(), { ...current, ...(partial || {}) });
+  broadcastSettings(next);
+  return next;
+});
+
+ipcMain.handle("settings:open", () => {
+  openSettingsWindow();
+  return { ok: true };
+});
+
+ipcMain.handle("host:open-in-editor", (_e, filePath) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+    mainWindow.webContents.send("host:open-path", String(filePath || ""));
+  }
+  return { ok: true };
 });
 
 ipcMain.handle("datetime:format", (_e, kind) => formatDateTime(kind, getSettings()));

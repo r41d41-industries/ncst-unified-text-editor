@@ -13,54 +13,18 @@
     <div id="app">
       <aside id="drawer" class="drawer open">
         <button id="drawer-toggle" class="drawer-toggle" type="button" title="Collapse drawer">«</button>
-        <nav class="rail" aria-label="File and view">
-          <button type="button" data-cmd="new" title="New">
-            <span class="icon" data-icon="new" aria-hidden="true"></span><span class="label">New</span>
-          </button>
-          <button type="button" data-cmd="open" title="Open">
-            <span class="icon" data-icon="open" aria-hidden="true"></span><span class="label">Open</span>
-          </button>
-          <button type="button" data-cmd="save" title="Save">
-            <span class="icon" data-icon="save" aria-hidden="true"></span><span class="label">Save</span>
-          </button>
-          <button type="button" data-cmd="saveAs" title="Save As">
-            <span class="icon" data-icon="saveAs" aria-hidden="true"></span><span class="label">Save As</span>
-          </button>
-          <button type="button" id="btn-live" data-cmd="live" title="Live Preview">
-            <span class="icon" data-icon="live" aria-hidden="true"></span><span class="label">Live</span>
-          </button>
-          <button type="button" id="btn-preview" data-cmd="reading" title="Reading view">
-            <span class="icon" data-icon="reading" aria-hidden="true"></span><span class="label">Reading</span>
-          </button>
-          <button type="button" id="btn-options" data-cmd="options" title="Options">
-            <span class="icon" data-icon="options" aria-hidden="true"></span><span class="label">Options</span>
-          </button>
-        </nav>
-        <section id="options-panel" class="hidden">
-          <h2>Options</h2>
-          <label><input id="opt-toolbar" type="checkbox" checked /> Show formatting bar</label>
-          <button id="opt-customize-toolbar" type="button">Customize formatting bar…</button>
-          <label><input id="opt-spell" type="checkbox" checked /> Spellcheck</label>
-          <label for="opt-date">Date format</label>
-          <input id="opt-date" type="text" value="MM/DD/YY" />
-          <label for="opt-time">Time format</label>
-          <input id="opt-time" type="text" value="h:mm A" />
-          <label for="opt-combined">Combined format</label>
-          <input id="opt-combined" type="text" value="{date} {time}" />
-          <h2>Recent files</h2>
-          <ul id="recent-files"></ul>
-        </section>
+        <nav class="rail" id="rail" aria-label="File and view"></nav>
       </aside>
       <div id="workspace">
         <div id="toolbar"></div>
-        <div id="doc-header">
-          <h2 id="doc-title" contenteditable="true" spellcheck="false" data-placeholder="Untitled"></h2>
-        </div>
         <div id="compose">
           <aside id="gutter" aria-label="Line type">
             <div id="gutter-marks"></div>
           </aside>
           <div id="compose-main">
+            <div id="doc-header">
+              <h2 id="doc-title" contenteditable="true" spellcheck="false" data-placeholder="Untitled"></h2>
+            </div>
             <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
             <div id="live" class="hidden"></div>
             <div id="preview" class="hidden"></div>
@@ -77,25 +41,6 @@
       <button type="button" class="ctx-item" data-block="h4">Heading 4</button>
       <button type="button" class="ctx-item" data-block="h5">Heading 5</button>
       <button type="button" class="ctx-item" data-block="h6">Heading 6</button>
-    </div>
-    <div id="toolbar-modal" class="modal hidden" role="dialog" aria-labelledby="toolbar-modal-title">
-      <div class="modal-card">
-        <header>
-          <h2 id="toolbar-modal-title">Formatting toolbar</h2>
-          <button id="toolbar-modal-close" type="button" title="Close">×</button>
-        </header>
-        <p class="modal-help">Icons show beside each tool. Check to include, then group, make a dropdown, or insert a divider.</p>
-        <div class="modal-actions">
-          <button id="toolbar-add-divider" type="button">Add divider</button>
-          <button id="toolbar-make-group" type="button">Group checked</button>
-          <button id="toolbar-make-dropdown" type="button">Make dropdown</button>
-        </div>
-        <ul id="toolbar-tool-list"></ul>
-        <footer>
-          <button id="toolbar-reset" type="button">Reset defaults</button>
-          <button id="toolbar-done" type="button" class="accent">Done</button>
-        </footer>
-      </div>
     </div>
     <script src="../node_modules/markdown-it/dist/markdown-it.min.js"></script>
     <script src="markdown.js"></script>

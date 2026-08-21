@@ -2,22 +2,10 @@
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
   } else {
-    root.NcstContextMenu = factory();
+    root.NcstContextMenu = factory(root.NcstTools);
   }
-})(typeof self !== "undefined" ? self : this, function () {
-  const FORMAT_ITEMS = [
-    { action: "bold", label: "Bold" },
-    { action: "italic", label: "Italic" },
-    { action: "strike", label: "Strikethrough" },
-    { action: "heading", label: "Heading" },
-    { action: "ul", label: "List" },
-    { action: "task", label: "Checklist" },
-    { action: "quote", label: "Quote" },
-    { action: "code", label: "Code" },
-    { action: "link", label: "Link" },
-    { action: "table", label: "Table" },
-    { action: "hr", label: "Horizontal rule" },
-  ];
+})(typeof self !== "undefined" ? self : this, function (tools) {
+  tools = tools || {};
 
   function el(tag, attrs, children) {
     const node = document.createElement(tag);
@@ -30,9 +18,14 @@
     return node;
   }
 
-  function addItem(menu, { action, label, disabled }, onPick) {
+  function addItem(menu, { action, label, disabled, icon }, onPick) {
     const btn = el("button", { type: "button", class: "ctx-item", disabled: !!disabled });
-    btn.textContent = label;
+    if (icon) {
+      const wrap = el("span", { class: "ctx-icon" });
+      wrap.innerHTML = icon;
+      btn.appendChild(wrap);
+    }
+    btn.appendChild(document.createTextNode(label));
     btn.dataset.action = action;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -46,7 +39,55 @@
     menu.appendChild(el("div", { class: "ctx-sep" }));
   }
 
-  function buildMenu(root, payload, onPick) {
+  function commandIcon(id, iconMap) {
+    if (!tools.resolveIcon) return "";
+    return tools.resolveIcon(id, iconMap).svg;
+  }
+
+  function addCommand(menu, id, iconMap, onPick) {
+    addItem(
+      menu,
+      {
+        action: id,
+        label: (tools.commandLabel && tools.commandLabel(id)) || id,
+        icon: commandIcon(id, iconMap),
+      },
+      onPick
+    );
+  }
+
+  function buildFromLayout(root, layout, iconMap, onPick) {
+    (layout || []).forEach((entry) => {
+      if (entry.t === "divider") {
+        addSep(root);
+        return;
+      }
+      if (entry.t === "tool") {
+        addCommand(root, entry.id, iconMap, onPick);
+        return;
+      }
+      if (entry.t === "dropdown" || entry.t === "group") {
+        const wrap = el("div", { class: "ctx-sub" });
+        const btn = el("button", { type: "button", class: "ctx-item ctx-sub-btn" });
+        const ic = el("span", { class: "ctx-icon" });
+        ic.innerHTML = (tools.ICONS && tools.ICONS.submenu) || "";
+        btn.appendChild(ic);
+        btn.appendChild(document.createTextNode(entry.label || "More"));
+        const chev = el("span", { class: "ctx-caret" });
+        chev.textContent = "▸";
+        btn.appendChild(chev);
+        const sub = el("div", { class: "ctx-sub-menu hidden" });
+        (entry.items || []).forEach((id) => addCommand(sub, id, iconMap, onPick));
+        btn.addEventListener("mouseenter", () => sub.classList.remove("hidden"));
+        wrap.addEventListener("mouseleave", () => sub.classList.add("hidden"));
+        wrap.appendChild(btn);
+        wrap.appendChild(sub);
+        root.appendChild(wrap);
+      }
+    });
+  }
+
+  function buildMenu(root, payload, onPick, layout, iconMap) {
     root.innerHTML = "";
     const miss = payload && payload.misspelledWord;
     const suggestions = (payload && payload.dictionarySuggestions) || [];
@@ -60,15 +101,11 @@
       addItem(root, { action: "dict:ignore", label: `Ignore “${miss}”` }, onPick);
       addSep(root);
     }
-    addItem(root, { action: "edit:cut", label: "Cut" }, onPick);
-    addItem(root, { action: "edit:copy", label: "Copy" }, onPick);
-    addItem(root, { action: "edit:paste", label: "Paste" }, onPick);
-    addSep(root);
-    FORMAT_ITEMS.forEach((item) => addItem(root, item, onPick));
-    addSep(root);
-    addItem(root, { action: "dt:date", label: "Insert date" }, onPick);
-    addItem(root, { action: "dt:time", label: "Insert time" }, onPick);
-    addItem(root, { action: "dt:combined", label: "Insert date and time" }, onPick);
+    const useLayout =
+      layout && layout.length
+        ? layout
+        : (tools.DEFAULT_CONTEXT_LAYOUT || []).map((e) => JSON.parse(JSON.stringify(e)));
+    buildFromLayout(root, useLayout, iconMap || {}, onPick);
   }
 
   function place(root, x, y) {
@@ -85,5 +122,5 @@
     root.classList.add("hidden");
   }
 
-  return { FORMAT_ITEMS, buildMenu, place, hide };
+  return { buildMenu, place, hide };
 });

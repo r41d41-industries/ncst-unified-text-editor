@@ -6,29 +6,12 @@
   const gutter = document.getElementById("gutter");
   const gutterMarks = document.getElementById("gutter-marks");
   const headingMenu = document.getElementById("heading-menu");
-  const toolbarModal = document.getElementById("toolbar-modal");
-  const toolbarToolList = document.getElementById("toolbar-tool-list");
   const drawer = document.getElementById("drawer");
   const drawerToggle = document.getElementById("drawer-toggle");
+  const rail = document.getElementById("rail");
   const toolbar = document.getElementById("toolbar");
-  const optionsPanel = document.getElementById("options-panel");
-  const btnLive = document.getElementById("btn-live");
-  const btnPreview = document.getElementById("btn-preview");
-  const btnOptions = document.getElementById("btn-options");
-  const optToolbar = document.getElementById("opt-toolbar");
-  const optCustomizeToolbar = document.getElementById("opt-customize-toolbar");
-  const optSpell = document.getElementById("opt-spell");
-  const optDate = document.getElementById("opt-date");
-  const optTime = document.getElementById("opt-time");
-  const optCombined = document.getElementById("opt-combined");
-  const recentList = document.getElementById("recent-files");
   const ctx = document.getElementById("ctx");
   const docTitle = document.getElementById("doc-title");
-
-  document.querySelectorAll("[data-icon]").forEach((el) => {
-    const svg = NcstTools.DRAWER_ICONS[el.getAttribute("data-icon")];
-    if (svg) el.innerHTML = svg;
-  });
 
   const host = window.api;
   if (!host) {
@@ -135,13 +118,13 @@
       liveHandle = window.NcstLive.mount({
         element: liveEl,
         markdown: body || "",
-        spellcheck: optSpell.checked,
+        spellcheck: !state.settings || state.settings.spellcheck !== false,
         onUpdate: () => markDirty(),
         onSelection: () => scheduleGutter(),
       });
     } else {
       liveHandle.setMarkdown(body || "");
-      liveHandle.setSpellcheck(optSpell.checked);
+      liveHandle.setSpellcheck(!state.settings || state.settings.spellcheck !== false);
     }
     return liveHandle;
   }
@@ -151,9 +134,13 @@
     editor.classList.toggle("hidden", mode !== "source");
     liveEl.classList.toggle("hidden", mode !== "live");
     preview.classList.toggle("hidden", mode !== "reading");
-    btnLive.classList.toggle("active", mode === "live");
-    btnPreview.classList.toggle("active", mode === "reading");
-    btnLive.disabled = state.kind === "text";
+    const liveBtn = rail.querySelector('[data-cmd="live"]');
+    const readBtn = rail.querySelector('[data-cmd="reading"]');
+    if (liveBtn) {
+      liveBtn.classList.toggle("active", mode === "live");
+      liveBtn.disabled = state.kind === "text";
+    }
+    if (readBtn) readBtn.classList.toggle("active", mode === "reading");
     gutter.classList.toggle("hidden", mode === "reading");
     toolbar.querySelectorAll("button").forEach((b) => {
       b.disabled = mode === "reading";
@@ -207,28 +194,58 @@
 
   function setToolbarVisible(visible) {
     toolbar.classList.toggle("hidden", !visible);
-    optToolbar.checked = !!visible;
+  }
+
+  function iconFor(id) {
+    return NcstTools.resolveIcon(id, state.settings && state.settings.iconMap).svg;
+  }
+
+  function renderRail() {
+    const layout = NcstTools.normalizeLayoutWith(
+      state.settings && state.settings.drawerLayout,
+      null,
+      NcstTools.COMMAND_IDS,
+      NcstTools.DEFAULT_DRAWER_LAYOUT
+    );
+    rail.innerHTML = "";
+    layout.forEach((entry) => {
+      if (entry.t === "divider") {
+        const sep = document.createElement("div");
+        sep.className = "rail-sep";
+        rail.appendChild(sep);
+        return;
+      }
+      const id = entry.id;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.cmd = id;
+      btn.title = NcstTools.commandLabel(id);
+      const ic = document.createElement("span");
+      ic.className = "icon";
+      ic.innerHTML = iconFor(id);
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = NcstTools.commandLabel(id);
+      btn.appendChild(ic);
+      btn.appendChild(label);
+      rail.appendChild(btn);
+    });
+    applyModeChrome();
   }
 
   function applySettings(settings) {
     state.settings = settings;
     setDrawerOpen(settings.drawerOpen !== false);
     setToolbarVisible(settings.toolbarVisible !== false);
-    optSpell.checked = settings.spellcheck !== false;
     editor.spellcheck = settings.spellcheck !== false;
     if (liveHandle) liveHandle.setSpellcheck(settings.spellcheck !== false);
-    optDate.value = settings.dateFormat || "MM/DD/YY";
-    optTime.value = settings.timeFormat || "h:mm A";
-    optCombined.value = settings.combinedFormat || "{date} {time}";
     renderToolbar(settings.toolbarLayout || settings.toolbarItems);
-    renderRecent(settings.recentFiles || []);
-    state.mode = settings.viewMode || "source";
+    renderRail();
   }
 
   function persist(partial) {
     return host.setSettings(partial).then((settings) => {
       state.settings = settings;
-      renderRecent(settings.recentFiles || []);
       return settings;
     });
   }
@@ -240,7 +257,7 @@
     btn.type = "button";
     btn.dataset.fmt = tool.id;
     btn.title = tool.label;
-    btn.innerHTML = (tool.icon || "") + '<span class="sr-only">' + tool.label + "</span>";
+    btn.innerHTML = iconFor(tool.id) + '<span class="sr-only">' + tool.label + "</span>";
     return btn;
   }
 
@@ -282,12 +299,7 @@
         btn.className = "toolbar-dd-btn";
         btn.title = entry.label;
         const iconId = entry.items[0] || "heading";
-        btn.innerHTML =
-          (NcstTools.BY_ID[iconId] && NcstTools.BY_ID[iconId].icon ? NcstTools.BY_ID[iconId].icon : NcstTools.ICONS.heading) +
-          '<span>' +
-          entry.label +
-          "</span>" +
-          NcstTools.ICONS.chevron;
+        btn.innerHTML = iconFor(iconId) + "<span>" + entry.label + "</span>" + NcstTools.ICONS.chevron;
         const menu = document.createElement("div");
         menu.className = "toolbar-dd-menu hidden";
         entry.items.forEach((id) => {
@@ -296,7 +308,7 @@
           const item = document.createElement("button");
           item.type = "button";
           item.dataset.fmt = tool.id;
-          item.innerHTML = (tool.icon || "") + "<span>" + tool.label + "</span>";
+          item.innerHTML = iconFor(tool.id) + "<span>" + tool.label + "</span>";
           menu.appendChild(item);
         });
         btn.addEventListener("click", (e) => {
@@ -423,180 +435,6 @@
     scheduleGutter();
   }
 
-  function currentLayout() {
-    return NcstTools.normalizeLayout(state.settings && state.settings.toolbarLayout, state.settings && state.settings.toolbarItems);
-  }
-
-  function usedToolIds(layout) {
-    return new Set(NcstTools.flattenLayout(layout));
-  }
-
-  function rowHtml(entry, nested) {
-    const li = document.createElement("li");
-    if (nested) li.className = "nest";
-    if (entry.t === "divider") {
-      li.dataset.kind = "divider";
-      li.innerHTML =
-        (NcstTools.ICONS.divider || "") +
-        '<span class="tool-label">Vertical divider</span>' +
-        '<button type="button" class="tool-move" data-act="remove">✕</button>' +
-        '<button type="button" class="tool-move" data-move="up">↑</button>' +
-        '<button type="button" class="tool-move" data-move="down">↓</button>';
-      return li;
-    }
-    if (entry.t === "tool") {
-      const tool = NcstTools.BY_ID[entry.id];
-      if (!tool) return null;
-      li.dataset.kind = "tool";
-      li.dataset.id = entry.id;
-      li.innerHTML =
-        '<span class="tool-icon">' +
-        (tool.icon || "") +
-        '</span><input type="checkbox" checked /><span class="tool-label">' +
-        tool.label +
-        '</span><button type="button" class="tool-move" data-move="up">↑</button><button type="button" class="tool-move" data-move="down">↓</button>';
-      return li;
-    }
-    if (entry.t === "group" || entry.t === "dropdown") {
-      li.dataset.kind = entry.t;
-      const icon = entry.t === "dropdown" ? NcstTools.ICONS.dropdown : NcstTools.ICONS.group;
-      const labelInput =
-        entry.t === "dropdown"
-          ? '<input type="text" data-dd-label value="' +
-            String(entry.label || "Menu").replace(/"/g, "&quot;") +
-            '" />'
-          : '<span class="tool-label">Button group</span>';
-      li.innerHTML =
-        '<span class="tool-icon">' +
-        icon +
-        "</span>" +
-        labelInput +
-        '<button type="button" class="tool-move" data-act="ungroup">Ungroup</button>' +
-        '<button type="button" class="tool-move" data-move="up">↑</button>' +
-        '<button type="button" class="tool-move" data-move="down">↓</button>';
-      const sub = document.createElement("ul");
-      entry.items.forEach((id) => {
-        const child = rowHtml({ t: "tool", id }, true);
-        if (child) {
-          child.querySelector("input").checked = true;
-          sub.appendChild(child);
-        }
-      });
-      li.appendChild(sub);
-      return li;
-    }
-    return null;
-  }
-
-  function paintCustomizer(layout) {
-    toolbarToolList.innerHTML = "";
-    layout.forEach((entry) => {
-      const row = rowHtml(entry, false);
-      if (row) toolbarToolList.appendChild(row);
-    });
-    const used = usedToolIds(layout);
-    NcstTools.CATALOG.forEach((tool) => {
-      if (used.has(tool.id)) return;
-      const li = document.createElement("li");
-      li.dataset.kind = "tool";
-      li.dataset.id = tool.id;
-      li.innerHTML =
-        '<span class="tool-icon">' +
-        (tool.icon || "") +
-        '</span><input type="checkbox" /><span class="tool-label">' +
-        tool.label +
-        '</span><button type="button" class="tool-move" data-move="up">↑</button><button type="button" class="tool-move" data-move="down">↓</button>';
-      toolbarToolList.appendChild(li);
-    });
-  }
-
-  function collectLayout() {
-    const layout = [];
-    [...toolbarToolList.children].forEach((li) => {
-      const kind = li.dataset.kind;
-      if (kind === "divider") {
-        layout.push({ t: "divider" });
-        return;
-      }
-      if (kind === "tool") {
-        const box = li.querySelector("input[type='checkbox']");
-        if (box && box.checked && li.dataset.id) layout.push({ t: "tool", id: li.dataset.id });
-        return;
-      }
-      if (kind === "group" || kind === "dropdown") {
-        const items = [...li.querySelectorAll(":scope > ul > li[data-id]")]
-          .filter((row) => {
-            const box = row.querySelector("input[type='checkbox']");
-            return box && box.checked;
-          })
-          .map((row) => row.dataset.id);
-        if (!items.length) return;
-        if (kind === "dropdown") {
-          const labelEl = li.querySelector("[data-dd-label]");
-          layout.push({ t: "dropdown", label: (labelEl && labelEl.value) || "Menu", items });
-        } else layout.push({ t: "group", items });
-      }
-    });
-    return NcstTools.normalizeLayout(layout, NcstTools.DEFAULT_ITEMS);
-  }
-
-  function openToolbarModal() {
-    paintCustomizer(currentLayout());
-    toolbarModal.classList.remove("hidden");
-  }
-
-  function closeToolbarModal() {
-    toolbarModal.classList.add("hidden");
-  }
-
-  function saveToolbarLayout(layout) {
-    const next = NcstTools.normalizeLayout(layout);
-    renderToolbar(next);
-    persist({ toolbarLayout: next, toolbarItems: NcstTools.flattenLayout(next) });
-  }
-
-  function selectedTopTools() {
-    return [...toolbarToolList.children]
-      .filter((li) => li.dataset.kind === "tool" && li.querySelector("input") && li.querySelector("input").checked)
-      .map((li) => li.dataset.id);
-  }
-
-  function wrapSelected(kind) {
-    const ids = selectedTopTools();
-    if (ids.length < 2) return;
-    const layout = collectLayout();
-    const firstIndex = layout.findIndex((e) => e.t === "tool" && e.id === ids[0]);
-    const without = layout.filter((e) => !(e.t === "tool" && ids.includes(e.id)));
-    const at = firstIndex < 0 ? without.length : Math.min(firstIndex, without.length);
-    const block =
-      kind === "dropdown"
-        ? { t: "dropdown", label: (NcstTools.BY_ID[ids[0]] && NcstTools.BY_ID[ids[0]].label) || "Menu", items: ids }
-        : { t: "group", items: ids };
-    without.splice(at, 0, block);
-    paintCustomizer(NcstTools.normalizeLayout(without));
-  }
-
-  function renderRecent(paths) {
-    recentList.innerHTML = "";
-    if (!paths.length) {
-      const li = document.createElement("li");
-      li.textContent = "None yet";
-      li.style.color = "#5c5c5c";
-      recentList.appendChild(li);
-      return;
-    }
-    paths.forEach((p) => {
-      const li = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.title = p;
-      btn.textContent = basename(p);
-      btn.addEventListener("click", () => openRecent(p));
-      li.appendChild(btn);
-      recentList.appendChild(li);
-    });
-  }
-
   async function confirmIfDirty() {
     if (!state.dirty) return "discard";
     return host.confirmUnsaved();
@@ -670,13 +508,7 @@
   }
 
   function cmdOptions() {
-    state.optionsOpen = !state.optionsOpen;
-    optionsPanel.classList.toggle("hidden", !state.optionsOpen);
-    btnOptions.classList.toggle("active", state.optionsOpen);
-    if (state.optionsOpen && !drawer.classList.contains("open")) {
-      setDrawerOpen(true);
-      persist({ drawerOpen: true });
-    }
+    host.openSettings();
   }
 
   function hideCtx() {
@@ -685,7 +517,13 @@
 
   function showCtx(payload, x, y) {
     state.misspelled = (payload && payload.misspelledWord) || "";
-    NcstContextMenu.buildMenu(ctx, payload, onMenuAction);
+    NcstContextMenu.buildMenu(
+      ctx,
+      payload,
+      dispatchAction,
+      state.settings && state.settings.contextLayout,
+      state.settings && state.settings.iconMap
+    );
     NcstContextMenu.place(ctx, x, y);
   }
 
@@ -776,50 +614,21 @@
     hideHeadingMenu();
   });
 
-  optCustomizeToolbar.addEventListener("click", () => openToolbarModal());
-  document.getElementById("toolbar-modal-close").addEventListener("click", closeToolbarModal);
-  document.getElementById("toolbar-done").addEventListener("click", () => {
-    saveToolbarLayout(collectLayout());
-    closeToolbarModal();
-  });
-  document.getElementById("toolbar-reset").addEventListener("click", () => {
-    saveToolbarLayout(NcstTools.DEFAULT_LAYOUT);
-    paintCustomizer(NcstTools.DEFAULT_LAYOUT);
-  });
-  document.getElementById("toolbar-add-divider").addEventListener("click", () => {
-    const next = collectLayout();
-    next.push({ t: "divider" });
-    paintCustomizer(next);
-  });
-  document.getElementById("toolbar-make-group").addEventListener("click", () => wrapSelected("group"));
-  document.getElementById("toolbar-make-dropdown").addEventListener("click", () => wrapSelected("dropdown"));
-  toolbarToolList.addEventListener("click", (e) => {
-    const li = e.target.closest("li");
-    if (!li) return;
-    const act = e.target.getAttribute("data-act");
-    if (act === "remove") {
-      li.remove();
-      return;
-    }
-    if (act === "ungroup") {
-      const kids = [...li.querySelectorAll(":scope > ul > li")];
-      kids.forEach((kid) => li.parentNode.insertBefore(kid, li));
-      li.remove();
-      return;
-    }
-    const move = e.target.getAttribute("data-move");
-    if (!move) return;
-    const parent = li.parentNode;
-    const siblings = [...parent.children].filter((n) => n.tagName === "LI");
-    const idx = siblings.indexOf(li);
-    if (move === "up" && idx > 0) parent.insertBefore(li, siblings[idx - 1]);
-    else if (move === "down" && idx >= 0 && idx < siblings.length - 1) parent.insertBefore(siblings[idx + 1], li);
-  });
+  function dispatchAction(action) {
+    hideCtx();
+    if (action === "new") return cmdNew();
+    if (action === "open") return cmdOpen();
+    if (action === "save") return cmdSave();
+    if (action === "saveAs") return cmdSaveAs();
+    if (action === "live") return cmdLive();
+    if (action === "reading") return cmdReading();
+    if (action === "options") return cmdOptions();
+    return onMenuAction(action);
+  }
 
   document.addEventListener("click", (e) => {
     if (!ctx.contains(e.target)) hideCtx();
     if (!headingMenu.contains(e.target) && !e.target.closest("#gutter")) hideHeadingMenu();
-    if (e.target === toolbarModal) closeToolbarModal();
     if (!e.target.closest(".toolbar-dd")) closeToolbarMenus();
   });
 
@@ -829,17 +638,9 @@
     persist({ drawerOpen: open });
   });
 
-  drawer.querySelectorAll("[data-cmd]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const cmd = btn.getAttribute("data-cmd");
-      if (cmd === "new") cmdNew();
-      else if (cmd === "open") cmdOpen();
-      else if (cmd === "save") cmdSave();
-      else if (cmd === "saveAs") cmdSaveAs();
-      else if (cmd === "live") cmdLive();
-      else if (cmd === "reading") cmdReading();
-      else if (cmd === "options") cmdOptions();
-    });
+  rail.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-cmd]");
+    if (btn) dispatchAction(btn.getAttribute("data-cmd"));
   });
 
   toolbar.addEventListener("click", (e) => {
@@ -867,26 +668,6 @@
     syncTitle();
   });
 
-  optToolbar.addEventListener("change", () => {
-    setToolbarVisible(optToolbar.checked);
-    persist({ toolbarVisible: optToolbar.checked });
-  });
-  optSpell.addEventListener("change", () => {
-    editor.spellcheck = optSpell.checked;
-    if (liveHandle) liveHandle.setSpellcheck(optSpell.checked);
-    persist({ spellcheck: optSpell.checked });
-  });
-  function saveFormats() {
-    persist({
-      dateFormat: optDate.value.trim() || "MM/DD/YY",
-      timeFormat: optTime.value.trim() || "h:mm A",
-      combinedFormat: optCombined.value.trim() || "{date} {time}",
-    });
-  }
-  optDate.addEventListener("change", saveFormats);
-  optTime.addEventListener("change", saveFormats);
-  optCombined.addEventListener("change", saveFormats);
-
   document.addEventListener("keydown", (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
     if (ctrl && e.key === "n") {
@@ -901,6 +682,9 @@
     } else if (ctrl && e.key === "s") {
       e.preventDefault();
       cmdSave();
+    } else if (ctrl && e.key === ",") {
+      e.preventDefault();
+      cmdOptions();
     } else if (ctrl && e.key === "e") {
       e.preventDefault();
       cycleMode();
@@ -918,7 +702,7 @@
     } else if (e.key === "Escape") {
       hideCtx();
       hideHeadingMenu();
-      closeToolbarModal();
+      closeToolbarMenus();
     } else if (e.key === "Enter" && e.shiftKey && state.mode === "source") {
       e.preventDefault();
       NcstFormat.insertAtCaret(editor, state.kind === "text" ? "\n" : "  \n");
@@ -951,6 +735,20 @@
 
   host.getSettings().then((settings) => {
     applySettings(settings);
+    if (settings.viewMode) state.mode = settings.viewMode;
     setContent("", null, "markdown");
   });
+  if (host.onSettingsChanged) {
+    host.onSettingsChanged((settings) => {
+      const mode = state.mode;
+      applySettings(settings);
+      state.mode = mode;
+      applyModeChrome();
+    });
+  }
+  if (host.onOpenPath) {
+    host.onOpenPath((filePath) => {
+      if (filePath) openRecent(filePath);
+    });
+  }
 })();

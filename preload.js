@@ -8,6 +8,14 @@ contextBridge.exposeInMainWorld("api", {
   saveFileAs: (content, suggestedName) => ipcRenderer.invoke("file:saveAs", content, suggestedName),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setSettings: (partial) => ipcRenderer.invoke("settings:set", partial),
+  openSettings: () => ipcRenderer.invoke("settings:open"),
+  openInEditor: (filePath) => ipcRenderer.invoke("host:open-in-editor", filePath),
+  onSettingsChanged: (cb) => {
+    ipcRenderer.on("settings:changed", (_e, data) => cb(data));
+  },
+  onOpenPath: (cb) => {
+    ipcRenderer.on("host:open-path", (_e, filePath) => cb(filePath));
+  },
   formatDateTime: (kind) => ipcRenderer.invoke("datetime:format", kind),
   addToDictionary: (word) => ipcRenderer.invoke("dict:add", word),
   ignoreWord: (word) => ipcRenderer.invoke("dict:ignore", word),

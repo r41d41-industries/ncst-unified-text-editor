@@ -43,6 +43,13 @@
     live: svg('<path d="M4 12h3l2-6 4 12 2-6h5"/>'),
     reading: svg('<path d="M2 6c4-2 8-2 10 0v14c-2-2-6-2-10 0z"/><path d="M22 6c-4-2-8-2-10 0v14c2-2 6-2 10 0z"/>'),
     options: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v2"/><path d="M12 19v2"/><path d="M5 6.5l1.7 1"/><path d="M17.3 16.5l1.7 1"/><path d="M3 12h2"/><path d="M19 12h2"/><path d="M5 17.5l1.7-1"/><path d="M17.3 7.5l1.7-1"/>'),
+    cut: svg('<path d="M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M8.5 8.5L20 20"/><path d="M8.5 15.5L20 4"/>'),
+    copy: svg('<rect x="9" y="9" width="10" height="12" rx="1"/><path d="M5 15V5h10"/>'),
+    paste: svg('<path d="M8 5h2a2 2 0 0 1 4 0h2v3H8z"/><rect x="6" y="8" width="12" height="12" rx="1"/>'),
+    date: svg('<rect x="4" y="6" width="16" height="14" rx="1"/><path d="M4 10h16"/><path d="M8 4v4"/><path d="M16 4v4"/>'),
+    time: svg('<circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/>'),
+    datetime: svg('<rect x="3" y="5" width="11" height="10" rx="1"/><path d="M3 9h11"/><circle cx="18" cy="16" r="4"/><path d="M18 14v2l1.5 1"/>'),
+    submenu: svg('<path d="M5 7h10"/><path d="M5 12h14"/><path d="M16 12l3 3-3 3"/><path d="M5 17h7"/>'),
   };
 
   const CATALOG = [
@@ -151,6 +158,127 @@
     return ids.length ? ids : DEFAULT_ITEMS.slice();
   }
 
+  const COMMANDS = {
+    new: { label: "New", icon: "fileNew", kind: "file" },
+    open: { label: "Open", icon: "fileOpen", kind: "file" },
+    save: { label: "Save", icon: "save", kind: "file" },
+    saveAs: { label: "Save As", icon: "saveAs", kind: "file" },
+    live: { label: "Live", icon: "live", kind: "view" },
+    reading: { label: "Reading", icon: "reading", kind: "view" },
+    options: { label: "Options", icon: "options", kind: "view" },
+    "edit:cut": { label: "Cut", icon: "cut", kind: "edit" },
+    "edit:copy": { label: "Copy", icon: "copy", kind: "edit" },
+    "edit:paste": { label: "Paste", icon: "paste", kind: "edit" },
+    "dt:date": { label: "Insert date", icon: "date", kind: "insert" },
+    "dt:time": { label: "Insert time", icon: "time", kind: "insert" },
+    "dt:combined": { label: "Insert date and time", icon: "datetime", kind: "insert" },
+  };
+  CATALOG.forEach((t) => {
+    COMMANDS[t.id] = { label: t.label, icon: t.id, kind: "format" };
+  });
+  const COMMAND_IDS = new Set(Object.keys(COMMANDS));
+
+  const DEFAULT_DRAWER_LAYOUT = [
+    { t: "tool", id: "new" },
+    { t: "tool", id: "open" },
+    { t: "tool", id: "save" },
+    { t: "tool", id: "saveAs" },
+    { t: "divider" },
+    { t: "tool", id: "live" },
+    { t: "tool", id: "reading" },
+    { t: "tool", id: "options" },
+  ];
+
+  const DEFAULT_CONTEXT_LAYOUT = [
+    { t: "tool", id: "edit:cut" },
+    { t: "tool", id: "edit:copy" },
+    { t: "tool", id: "edit:paste" },
+    { t: "divider" },
+    { t: "dropdown", label: "Format", items: ["bold", "italic", "strike", "heading", "ul", "task", "quote", "code", "link", "table", "hr"] },
+    { t: "divider" },
+    { t: "tool", id: "dt:date" },
+    { t: "tool", id: "dt:time" },
+    { t: "tool", id: "dt:combined" },
+  ];
+
+  const ICON_KEYS = Object.keys(ICONS);
+
+  function commandLabel(id) {
+    return (COMMANDS[id] && COMMANDS[id].label) || id;
+  }
+
+  function defaultIconKey(id) {
+    return (COMMANDS[id] && COMMANDS[id].icon) || id;
+  }
+
+  function iconSvg(key) {
+    return ICONS[key] || ICONS.heading;
+  }
+
+  function resolveIcon(id, iconMap) {
+    const key = (iconMap && iconMap[id] && ICONS[iconMap[id]] && iconMap[id]) || defaultIconKey(id);
+    return { key, svg: iconSvg(key) };
+  }
+
+  function normalizeIconMap(map) {
+    const out = {};
+    if (!map || typeof map !== "object") return out;
+    Object.keys(map).forEach((id) => {
+      if (ICONS[map[id]]) out[id] = map[id];
+    });
+    return out;
+  }
+
+  function cleanIdsIn(ids, allowed) {
+    const seen = new Set();
+    const out = [];
+    (ids || []).forEach((id) => {
+      if (allowed.has(id) && !seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    });
+    return out;
+  }
+
+  function normalizeLayoutWith(layout, fallbackItems, allowed, defaultLayout) {
+    function entryOf(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      if (raw.t === "divider" || raw.type === "divider") return { t: "divider" };
+      if (raw.t === "group" || raw.type === "group") {
+        const items = cleanIdsIn(raw.items, allowed);
+        return items.length ? { t: "group", items } : null;
+      }
+      if (raw.t === "dropdown" || raw.type === "dropdown" || raw.t === "submenu") {
+        const items = cleanIdsIn(raw.items, allowed);
+        if (!items.length) return null;
+        const label = String(raw.label || commandLabel(items[0]) || "Menu").slice(0, 32);
+        return { t: "dropdown", label, items };
+      }
+      const id = raw.id;
+      if (!allowed.has(id)) return null;
+      return { t: "tool", id };
+    }
+    if (Array.isArray(layout) && layout.length) {
+      const out = layout.map(entryOf).filter(Boolean);
+      if (out.length) return out;
+    }
+    if (Array.isArray(fallbackItems) && fallbackItems.length) {
+      const ids = cleanIdsIn(fallbackItems, allowed);
+      if (ids.length) return ids.map((id) => ({ t: "tool", id }));
+    }
+    return (defaultLayout || []).map((e) => JSON.parse(JSON.stringify(e)));
+  }
+
+  function flattenLayoutWith(layout, allowed, defaultLayout) {
+    const ids = [];
+    normalizeLayoutWith(layout, null, allowed, defaultLayout).forEach((entry) => {
+      if (entry.t === "tool") ids.push(entry.id);
+      if (entry.t === "group" || entry.t === "dropdown") ids.push(...entry.items);
+    });
+    return cleanIdsIn(ids, allowed);
+  }
+
   const DRAWER_ICONS = {
     new: ICONS.fileNew,
     open: ICONS.fileOpen,
@@ -165,14 +293,28 @@
     CATALOG,
     BY_ID,
     ICONS,
+    ICON_KEYS,
     DRAWER_ICONS,
+    COMMANDS,
+    COMMAND_IDS,
     ALLOWED,
     DEFAULT_ITEMS,
     DEFAULT_LAYOUT,
+    DEFAULT_DRAWER_LAYOUT,
+    DEFAULT_CONTEXT_LAYOUT,
     svg,
+    commandLabel,
+    defaultIconKey,
+    iconSvg,
+    resolveIcon,
+    normalizeIconMap,
     normalizeItems,
     normalizeLayout,
+    normalizeLayoutWith,
     flattenLayout,
+    flattenLayoutWith,
     cleanIds,
+    cleanIdsIn,
   };
 });
+

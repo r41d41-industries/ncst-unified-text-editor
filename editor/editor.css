@@ -104,7 +104,12 @@ body {
 
 .rail button.active {
   background: var(--bg);
-  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.rail-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 10px;
 }
 
 .rail .icon {
@@ -294,7 +299,8 @@ body {
 }
 
 #doc-header {
-  padding: 16px 18px 28px 18px;
+  flex: 0 0 auto;
+  padding: 16px 18px 28px;
 }
 
 #doc-title {
@@ -370,6 +376,143 @@ body {
 .toolbar-dd-menu button svg,
 #toolbar-tool-list svg {
   flex-shrink: 0;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.settings-tabs .tab {
+  border: 0;
+  background: transparent;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text);
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tabs .tab.active {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.settings-main {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 18px 24px;
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.settings-footer button,
+.modal-card footer button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.settings-footer button.accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.tab-panel h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.tab-panel label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.tab-panel input[type="text"] {
+  width: 100%;
+  max-width: 280px;
+  margin: 0 0 10px;
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.customize-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.customize-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.icon-pick {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-picker {
+  position: fixed;
+  z-index: 40;
+  width: 260px;
+  max-height: 240px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+}
+
+.icon-picker button {
+  border: 1px solid transparent;
+  background: var(--panel);
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.icon-picker button:hover {
+  border-color: var(--accent);
 }
 
 .sr-only {
@@ -594,7 +737,7 @@ body {
   position: fixed;
   z-index: 20;
   min-width: 220px;
-  max-width: 280px;
+  overflow: visible;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -603,7 +746,9 @@ body {
 }
 
 .ctx-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
   border: 0;
@@ -612,6 +757,34 @@ body {
   border-radius: 4px;
   cursor: pointer;
   color: var(--text);
+}
+
+.ctx-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+}
+
+.ctx-caret {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.ctx-sub {
+  position: relative;
+}
+
+.ctx-sub-menu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  min-width: 180px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  padding: 4px;
+  z-index: 21;
 }
 
 .ctx-item:disabled {

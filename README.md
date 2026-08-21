@@ -12,8 +12,9 @@ Electron markdown/text editor for local `.md` and `.txt` files. Standalone app, 
 - Three views: **Source** (raw markdown), **Live** (edit inside formatted lists/tables), **Reading** (HTML)
 - Live Preview: Enter continues a list or starts a new paragraph; Shift+Enter is a soft line break (same list item, tight spacing)
 - Line gutter: current heading/paragraph chip; click to set Paragraph or Heading 1–6
-- Document title (H2) at the top of the editor; editing it sets the default name in Save / Save As
-- Options → **Customize formatting bar**: icons, order, groups, dropdowns, and vertical dividers
+- Document title (H2) aligned with the body text; editing it sets the default name in Save / Save As
+- **Options** opens a settings window (tabs: General, Toolbar, Left menu, Right-click, Icons). Also **Ctrl+,**
+- Toolbar / left menu / right-click menu are customizable (order, dividers, groups or submenus, per-command icons)
 - Live Preview: Tab / Shift+Tab indent or outdent lists; type in table cells
 - Custom spellcheck dictionary (add / ignore)
 - `.txt` files stay Source / Reading (no Live)

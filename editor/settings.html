@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Settings</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body class="settings-body">
+    <nav class="settings-tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="general">General</button>
+      <button type="button" class="tab" data-tab="toolbar">Toolbar</button>
+      <button type="button" class="tab" data-tab="drawer">Left menu</button>
+      <button type="button" class="tab" data-tab="context">Right-click</button>
+      <button type="button" class="tab" data-tab="icons">Icons</button>
+    </nav>
+    <main class="settings-main">
+      <section id="tab-general" class="tab-panel">
+        <h2>General</h2>
+        <label><input id="opt-toolbar" type="checkbox" /> Show formatting bar</label>
+        <label><input id="opt-spell" type="checkbox" /> Spellcheck</label>
+        <label for="opt-date">Date format</label>
+        <input id="opt-date" type="text" />
+        <label for="opt-time">Time format</label>
+        <input id="opt-time" type="text" />
+        <label for="opt-combined">Combined format</label>
+        <input id="opt-combined" type="text" />
+        <h2>Recent files</h2>
+        <ul id="recent-files"></ul>
+      </section>
+      <section id="tab-toolbar" class="tab-panel hidden">
+        <h2>Formatting toolbar</h2>
+        <p class="modal-help">Check tools, then group, make a dropdown, or add a vertical divider. Click an icon to change it.</p>
+        <div class="modal-actions">
+          <button type="button" data-for="toolbar" data-act="divider">Add divider</button>
+          <button type="button" data-for="toolbar" data-act="group">Group checked</button>
+          <button type="button" data-for="toolbar" data-act="dropdown">Make dropdown</button>
+        </div>
+        <ul id="list-toolbar" class="customize-list"></ul>
+      </section>
+      <section id="tab-drawer" class="tab-panel hidden">
+        <h2>Left menu</h2>
+        <p class="modal-help">Reorder commands, add horizontal dividers, and include formatting buttons. Click an icon to change it.</p>
+        <div class="modal-actions">
+          <button type="button" data-for="drawer" data-act="divider">Add divider</button>
+        </div>
+        <ul id="list-drawer" class="customize-list"></ul>
+      </section>
+      <section id="tab-context" class="tab-panel hidden">
+        <h2>Right-click menu</h2>
+        <p class="modal-help">Spell suggestions always appear first when a word is misspelled. Group checked items into a submenu, or add a divider.</p>
+        <div class="modal-actions">
+          <button type="button" data-for="context" data-act="divider">Add divider</button>
+          <button type="button" data-for="context" data-act="dropdown">Make submenu</button>
+        </div>
+        <ul id="list-context" class="customize-list"></ul>
+      </section>
+      <section id="tab-icons" class="tab-panel hidden">
+        <h2>Icons</h2>
+        <p class="modal-help">Click a row to assign any icon to that command. Used in the toolbar, left menu, and right-click menu.</p>
+        <ul id="icon-assign-list" class="customize-list"></ul>
+      </section>
+    </main>
+    <footer class="settings-footer">
+      <button type="button" id="settings-reset">Reset this tab</button>
+      <button type="button" id="settings-save" class="accent">Save</button>
+    </footer>
+    <div id="icon-picker" class="icon-picker hidden"></div>
+    <script src="tools.js"></script>
+    <script src="customize.js"></script>
+    <script src="settings.js"></script>
+  </body>
+</html>

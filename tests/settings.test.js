@@ -41,3 +41,14 @@ test("migrates a flat toolbarItems list to layout tools", () => {
     ["bold", "table"]
   );
 });
+
+test("default drawer includes options and a divider", () => {
+  const s = normalizeSettings({});
+  assert.ok(s.drawerLayout.some((e) => e.t === "divider"));
+  assert.ok(s.drawerLayout.some((e) => e.t === "tool" && e.id === "options"));
+});
+
+test("default context menu has a format submenu", () => {
+  const s = normalizeSettings({});
+  assert.ok(s.contextLayout.some((e) => e.t === "dropdown"));
+});
